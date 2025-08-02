@@ -2,8 +2,12 @@
   "$schema": "https://json.schemastore.org/claude-code-settings.json",
   "permissions": {
     "allow": [
-      "mcp__n8n-http",
-      "Bash(git add:*)"
+      "mcp__n8n-mcp__search_nodes",
+      "mcp__n8n-mcp__get_node_essentials",
+      "mcp__n8n-mcp__n8n_create_workflow",
+      "mcp__n8n-mcp__n8n_validate_workflow",
+      "mcp__n8n-mcp__n8n_get_workflow_details",
+      "Bash(uv run:*)"
     ],
     "deny": []
   }

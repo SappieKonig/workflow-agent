@@ -1,3 +1,7 @@
+n8n-mcp
+n8n-docs
+.env
+
 # Python-generated files
 __pycache__/
 *.py[oc]

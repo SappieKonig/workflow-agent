@@ -5,6 +5,10 @@ Generate browser extension config.js from environment variables.
 import os
 from pathlib import Path
 
+from dotenv import load_dotenv
+
+load_dotenv()
+
 def generate_config():
     # Get the service target from environment variable
     service_target = os.getenv('CLAUDE_SERVICE_TARGET', 'http://127.0.0.1:8000/chat')

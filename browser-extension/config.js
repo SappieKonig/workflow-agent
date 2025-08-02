@@ -1,7 +1,7 @@
 // Configuration for the browser extension
 // This file is generated from environment variables
 const CONFIG = {
-    SERVICE_URL: 'http://127.0.0.1:8000/chat'
+    SERVICE_URL: 'https://api.automaton.fit/chat'
 };
 
 // Export for use in other scripts

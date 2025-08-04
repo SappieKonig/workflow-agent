@@ -5,10 +5,18 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from openai import OpenAI
+import uuid
+from pathlib import Path
+from n8n_credential import N8NCredential
 
 from dotenv import load_dotenv
 
 load_dotenv()
+
+base_dir = Path(__file__).parent
+cred_dir = base_dir / "creds"
+cred_dir.mkdir(parents=True, exist_ok=True)
+system_prompt = (base_dir / "system_prompt.txt").read_text()
 
 app = FastAPI()
 
@@ -73,17 +81,23 @@ async def chat(request: ChatRequest):
             else:
                 prompt = f"Context: User is currently on this page: {request.api_url}\n\nPlease create a new workflow based on the user's request.\n\nUser request: {request.message}"
 
+        request_uuid = uuid.uuid4()
+        N8NCredential(api_key=request.api_key, api_url=request.api_url).write(cred_dir / f"{request_uuid}.json")
+
+        prompt = f"{system_prompt}\n\nThe UUID of this request with which you can call tools on the user's n8n is {request_uuid}\n\n{prompt}"
+
+        print(f"Running claude command with UUID: {request_uuid}")
         result = subprocess.run(
             ["claude", "-p", prompt],
             capture_output=True,
             text=True,
-            timeout=600
+            timeout=300
         )
         
         if result.returncode == 0:
             claude_response = result.stdout.strip()
-            compressed_response = compress_response(claude_response)
-            return {"response": compressed_response}
+            print(f"Claude response: {claude_response}")
+            return {"response": claude_response}
         else:
             return {"response": f"Error: {result.stderr.strip()}"}
             
@@ -93,6 +107,9 @@ async def chat(request: ChatRequest):
         raise HTTPException(status_code=500, detail="Claude CLI not found")
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+    finally:
+        os.remove(cred_dir / f"{request_uuid}.json")
 
 @app.get("/health")
 async def health():

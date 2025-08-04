@@ -9,6 +9,7 @@ import os
 import sys
 from pathlib import Path
 import uuid
+from n8n_credential import N8NCredential
 
 import mcp.types as types
 from dotenv import load_dotenv
@@ -16,6 +17,7 @@ load_dotenv()
 
 
 class DirectMCPClient:
+    cred_dir = Path(__file__).parent / "creds"
     """Direct client to test the original n8n-mcp server."""
     
     def __init__(self):
@@ -48,8 +50,6 @@ class DirectMCPClient:
             'n8n_list_available_tools', 'n8n_diagnostic'
         }
 
-        self.credential_store = {'3e1b2f4a-9c7d-4e35-8a2f-1b6d9c0f4a7e': {'apiUrl': 'https://sheggle.app.n8n.cloud/', 'apiKey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJjNmQ5YjAxYS0wOGRiLTQ5NDEtYTFiNC1kNGEyMWEzZjNjZTEiLCJpc3MiOiJuOG4iLCJhdWQiOiJwdWJsaWMtYXBpIiwiaWF0IjoxNzU0MTQ0MTkwLCJleHAiOjE3NTY2Nzc2MDB9.6ITeZW5xm7ou372gs1MvXKekZ8DV0HnTozSJH1ERLns'}}
-        
         print(f"🚀 Starting command: {' '.join(cmd)}", file=sys.stderr)
         
         self.process = await asyncio.create_subprocess_exec(
@@ -183,9 +183,11 @@ class DirectMCPClient:
         if tool_name in self.n8n_management_tools and "apiUuid" in arguments:
             # Look up credentials by UUID
             api_uuid = arguments.pop("apiUuid")
-            credentials = self.credential_store.get(api_uuid)
+
+            if os.path.exists(self.cred_dir / f"{api_uuid}.json"):
+                credentials = N8NCredential.read(self.cred_dir / f"{api_uuid}.json")
             
-            if not credentials:
+            else:
                 print(f"❌ ERROR: No credentials found for UUID {api_uuid}", file=sys.stderr)
                 return [types.TextContent(
                     type="text",
@@ -196,8 +198,8 @@ class DirectMCPClient:
                 )]
             
             # Replace apiUuid with actual credentials
-            arguments["apiUrl"] = credentials["apiUrl"]
-            arguments["apiKey"] = credentials["apiKey"]
+            arguments["apiUrl"] = credentials.api_url
+            arguments["apiKey"] = credentials.api_key
         
         print(f"🔧 Testing tools/call for '{tool_name}' with args: {arguments}", file=sys.stderr)
         

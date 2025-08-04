@@ -1,5 +1,6 @@
 n8n-mcp
 .claude
+creds/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

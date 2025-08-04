@@ -7,9 +7,12 @@ import asyncio
 import json
 import os
 import sys
+from pathlib import Path
 
+import mcp.types as types
 from dotenv import load_dotenv
 load_dotenv()
+
 
 class DirectMCPClient:
     """Direct client to test the original n8n-mcp server."""
@@ -20,12 +23,14 @@ class DirectMCPClient:
         self.writer = None
         self.request_id = 0
     
-    async def connect(self):
+    async def connect(self) -> "DirectMCPClient":
         """Connect to the original n8n-mcp server."""
         print("🔌 Connecting to original n8n-mcp server...", file=sys.stderr)
         
         # Original server configuration (same as proxy)
-        cmd = ["node", "/Users/ignacekonig/projects/n8n-mcp/dist/mcp/index.js"]
+        index_path = Path(__file__).parent / "n8n-mcp" / "dist" / "mcp" / "index.js"
+        # index_path = "/Users/ignacekonig/projects/n8n-mcp/dist/mcp/index.js"
+        cmd = ["node", str(index_path)]
         env = os.environ.copy()
         env.update({
             "MCP_MODE": "stdio",
@@ -51,8 +56,9 @@ class DirectMCPClient:
         # Initialize the connection
         await self._initialize()
         print("✅ Connected and initialized!", file=sys.stderr)
+        return self
     
-    async def disconnect(self):
+    async def disconnect(self) -> None:
         """Disconnect from the original n8n-mcp server."""
         if self.writer:
             self.writer.close()
@@ -67,7 +73,7 @@ class DirectMCPClient:
         self.request_id += 1
         return self.request_id
     
-    async def _send_request(self, request: dict):
+    async def _send_request(self, request: dict) -> None:
         """Send a request to the original server."""
         message = json.dumps(request) + "\n"
         self.writer.write(message.encode())
@@ -84,7 +90,7 @@ class DirectMCPClient:
         print(f"📥 RECEIVED: {json.dumps(response, indent=2)}", file=sys.stderr)
         return response
     
-    async def _initialize(self):
+    async def _initialize(self) -> None:
         """Send initialization sequence."""
         print("🔄 Sending initialize request...", file=sys.stderr)
         
@@ -119,7 +125,7 @@ class DirectMCPClient:
         }
         await self._send_request(initialized_notification)
     
-    async def list_tools(self):
+    async def list_tools(self) -> list[types.Tool]:
         """Test tools/list request."""
         print("📋 Testing tools/list...", file=sys.stderr)
         
@@ -134,22 +140,31 @@ class DirectMCPClient:
         
         if "error" in response:
             print(f"❌ ERROR in tools/list: {response['error']}", file=sys.stderr)
-            return None
+            return []
         
-        tools = response.get("result", {}).get("tools", [])
-        print(f"✅ SUCCESS: Found {len(tools)} tools", file=sys.stderr)
+        tools_data = response.get("result", {}).get("tools", [])
+        print(f"✅ SUCCESS: Found {len(tools_data)} tools", file=sys.stderr)
         
         # Print first few tool names
-        if tools:
+        if tools_data:
             print("🔧 Available tools:", file=sys.stderr)
-            for i, tool in enumerate(tools[:5]):
+            for i, tool in enumerate(tools_data[:5]):
                 print(f"   {i+1}. {tool['name']}", file=sys.stderr)
-            if len(tools) > 5:
-                print(f"   ... and {len(tools) - 5} more", file=sys.stderr)
+            if len(tools_data) > 5:
+                print(f"   ... and {len(tools_data) - 5} more", file=sys.stderr)
+        
+        # Convert to MCP Tool objects
+        tools = []
+        for tool_data in tools_data:
+            tools.append(types.Tool(
+                name=tool_data["name"],
+                description=tool_data.get("description", ""),
+                inputSchema=tool_data.get("inputSchema", {})
+            ))
         
         return tools
     
-    async def call_tool(self, tool_name: str, arguments: dict = None):
+    async def call_tool(self, tool_name: str, arguments: dict | None = None) -> list[types.TextContent]:
         """Test tools/call request."""
         if arguments is None:
             arguments = {}
@@ -171,13 +186,23 @@ class DirectMCPClient:
         
         if "error" in response:
             print(f"❌ ERROR in tools/call: {response['error']}", file=sys.stderr)
-            return None
+            return []
         
         result = response.get("result", {})
         print(f"✅ SUCCESS: Tool call completed", file=sys.stderr)
         print(f"📊 Result structure: {list(result.keys())}", file=sys.stderr)
         
-        return result
+        # Convert to MCP TextContent objects
+        content_data = result.get("content", [])
+        content = []
+        for item in content_data:
+            if item.get("type") == "text":
+                content.append(types.TextContent(
+                    type="text",
+                    text=item.get("text", "")
+                ))
+        
+        return content
 
 
 async def main():
@@ -212,30 +237,27 @@ async def main():
         result1 = await client.call_tool("get_database_statistics")
         if result1:
             print("✅ SUCCESS", file=sys.stderr)
-            content = result1.get("content", [])
-            if content and content[0].get("type") == "text":
+            if result1 and result1[0].text:
                 with open("output.txt", "a", encoding="utf-8") as f:
-                    f.write(f"Test 1 - get_database_statistics:\n{content[0]['text']}\n\n")
+                    f.write(f"Test 1 - get_database_statistics:\n{result1[0].text}\n\n")
         
         # Test 2: list_nodes with arguments
         print("\n🔧 Test 2: list_nodes with limit", file=sys.stderr)
         result2 = await client.call_tool("list_nodes", {"limit": 3})
         if result2:
             print("✅ SUCCESS", file=sys.stderr)
-            content = result2.get("content", [])
-            if content and content[0].get("type") == "text":
+            if result2 and result2[0].text:
                 with open("output.txt", "a", encoding="utf-8") as f:
-                    f.write(f"Test 2 - list_nodes:\n{content[0]['text']}\n\n")
+                    f.write(f"Test 2 - list_nodes:\n{result2[0].text}\n\n")
         
         # Test 3: search_nodes 
         print("\n🔧 Test 3: search_nodes", file=sys.stderr)
         result3 = await client.call_tool("search_nodes", {"query": "webhook", "limit": 2})
         if result3:
             print("✅ SUCCESS", file=sys.stderr)
-            content = result3.get("content", [])
-            if content and content[0].get("type") == "text":
+            if result3 and result3[0].text:
                 with open("output.txt", "a", encoding="utf-8") as f:
-                    f.write(f"Test 3 - search_nodes:\n{content[0]['text']}\n\n")
+                    f.write(f"Test 3 - search_nodes:\n{result3[0].text}\n\n")
         
         # Test 4: Create a Gmail forwarding workflow
         print("\n🔧 Test 4: Creating a Gmail forwarding workflow", file=sys.stderr)
@@ -297,10 +319,9 @@ async def main():
         result4 = await client.call_tool("n8n_create_workflow", workflow_data)
         if result4:
             print("✅ SUCCESS", file=sys.stderr)
-            content = result4.get("content", [])
-            if content and content[0].get("type") == "text":
+            if result4 and result4[0].text:
                 with open("output.txt", "a", encoding="utf-8") as f:
-                    f.write(f"Test 4 - n8n_create_workflow:\n{content[0]['text']}\n\n")
+                    f.write(f"Test 4 - n8n_create_workflow:\n{result4[0].text}\n\n")
         
         # Test 5: Validate the workflow we just created
         print("\n🔧 Test 5: Validating the created workflow", file=sys.stderr)
@@ -315,10 +336,9 @@ async def main():
         })
         if result5:
             print("✅ SUCCESS", file=sys.stderr)
-            content = result5.get("content", [])
-            if content and content[0].get("type") == "text":
+            if result5 and result5[0].text:
                 with open("output.txt", "a", encoding="utf-8") as f:
-                    f.write(f"Test 5 - validate_workflow:\n{content[0]['text']}\n\n")
+                    f.write(f"Test 5 - validate_workflow:\n{result5[0].text}\n\n")
         
         print(f"\n🎉 All tool calls completed successfully!", file=sys.stderr)
         

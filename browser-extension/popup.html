@@ -55,12 +55,20 @@
       font-size: 12px;
       color: #666;
     }
+    
+    .domain-info {
+      font-size: 11px;
+      color: #888;
+      margin-top: 4px;
+      font-weight: normal;
+    }
   </style>
 </head>
 <body>
   <div class="header">
     <div class="title">Chat Box</div>
-    <div class="subtitle">Toggle the right-side chat</div>
+    <div class="subtitle">Toggle for this domain</div>
+    <div id="currentDomain" class="domain-info"></div>
   </div>
   
   <button id="toggleButton" class="toggle-button">

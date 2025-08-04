@@ -10,7 +10,7 @@ from mcp_calling import DirectMCPClient
 
 
 @asynccontextmanager
-async def server_lifespan(_server: Server) -> AsyncIterator[DirectMCPClient]:
+async def server_lifespan(_server: Server) -> AsyncIterator[dict]:
     client = await DirectMCPClient().connect()
     try:
         yield {'client': client}
@@ -18,11 +18,13 @@ async def server_lifespan(_server: Server) -> AsyncIterator[DirectMCPClient]:
         await client.disconnect()
         
 
-server = Server('n8n-mcp-proxy', server_lifespan)
+server = Server('n8n-mcp-proxy', lifespan=server_lifespan)
 
 
 @server.list_tools()
-async def list_tools(client: DirectMCPClient) -> list[types.Tool]:
+async def list_tools() -> list[types.Tool]:
+    ctx = server.request_context
+    client = ctx.lifespan_context['client']
     return await client.list_tools()
 
 

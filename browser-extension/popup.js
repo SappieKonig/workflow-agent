@@ -2,21 +2,53 @@ document.addEventListener('DOMContentLoaded', () => {
   console.log('Popup loaded');
   const toggleButton = document.getElementById('toggleButton');
   const status = document.getElementById('status');
+  const currentDomain = document.getElementById('currentDomain');
 
-  if (!toggleButton || !status) {
+  if (!toggleButton || !status || !currentDomain) {
     console.error('Could not find required elements');
     return;
   }
 
-  chrome.storage.local.get(['chatBoxVisible'], (result) => {
-    console.log('Storage result:', result);
-    if (result.chatBoxVisible) {
-      status.textContent = 'Chat box is visible';
-      toggleButton.textContent = 'Hide Chat Box';
-    } else {
-      status.textContent = 'Chat box is hidden';
-      toggleButton.textContent = 'Show Chat Box';
+  // Get current tab info first
+  chrome.tabs.query({active: true, currentWindow: true}, (tabs) => {
+    if (tabs.length === 0) {
+      status.textContent = 'Error: No active tab';
+      return;
     }
+
+    const tab = tabs[0];
+    let domain;
+    
+    try {
+      domain = new URL(tab.url).hostname;
+      currentDomain.textContent = domain;
+    } catch (error) {
+      domain = 'unknown';
+      currentDomain.textContent = 'Invalid URL';
+    }
+
+    // Check if we're on a restricted page
+    if (tab.url.startsWith('chrome://') || tab.url.startsWith('chrome-extension://') || 
+        tab.url.startsWith('about:') || tab.url.startsWith('moz-extension://')) {
+      status.textContent = 'Not available on this page';
+      toggleButton.disabled = true;
+      return;
+    }
+
+    // Get domain-specific state
+    chrome.storage.local.get(['domainStates'], (result) => {
+      console.log('Storage result:', result);
+      const domainStates = result.domainStates || {};
+      const isEnabled = domainStates[domain] || false;
+      
+      if (isEnabled) {
+        status.textContent = 'Chat box is enabled';
+        toggleButton.textContent = 'Disable Chat Box';
+      } else {
+        status.textContent = 'Chat box is disabled';
+        toggleButton.textContent = 'Enable Chat Box';
+      }
+    });
   });
 
   toggleButton.addEventListener('click', () => {
@@ -30,6 +62,14 @@ document.addEventListener('DOMContentLoaded', () => {
       }
 
       const tab = tabs[0];
+      let domain;
+      
+      try {
+        domain = new URL(tab.url).hostname;
+      } catch (error) {
+        status.textContent = 'Error: Invalid URL';
+        return;
+      }
       
       // Check if we're on a restricted page
       if (tab.url.startsWith('chrome://') || tab.url.startsWith('chrome-extension://') || 
@@ -39,13 +79,13 @@ document.addEventListener('DOMContentLoaded', () => {
       }
 
       // First try to send message
-      chrome.tabs.sendMessage(tab.id, {action: 'toggleChatBox'}, (response) => {
+      chrome.tabs.sendMessage(tab.id, {action: 'toggleChatBox', domain: domain}, (response) => {
         if (chrome.runtime.lastError) {
           console.log('Content script not found, injecting...');
           // Content script not running, inject it
           chrome.scripting.executeScript({
             target: { tabId: tab.id },
-            files: ['content.js']
+            files: ['config.js', 'content.js']
           }, () => {
             if (chrome.runtime.lastError) {
               console.error('Injection error:', chrome.runtime.lastError);
@@ -60,35 +100,38 @@ document.addEventListener('DOMContentLoaded', () => {
             }, () => {
               // Wait a bit for script to load then send message
               setTimeout(() => {
-                chrome.tabs.sendMessage(tab.id, {action: 'toggleChatBox'}, (response) => {
+                chrome.tabs.sendMessage(tab.id, {action: 'toggleChatBox', domain: domain}, (response) => {
                   if (chrome.runtime.lastError) {
                     console.error('Message sending error after injection:', chrome.runtime.lastError);
                     status.textContent = 'Error: ' + chrome.runtime.lastError.message;
                     return;
                   }
-                  updateButtonState();
+                  updateButtonState(domain);
                 });
               }, 100);
             });
           });
         } else {
           console.log('Message sent successfully');
-          updateButtonState();
+          updateButtonState(domain);
         }
       });
     });
   });
 
-  function updateButtonState() {
+  function updateButtonState(domain) {
     setTimeout(() => {
-      chrome.storage.local.get(['chatBoxVisible'], (result) => {
+      chrome.storage.local.get(['domainStates'], (result) => {
         console.log('Updated storage:', result);
-        if (result.chatBoxVisible) {
-          status.textContent = 'Chat box is visible';
-          toggleButton.textContent = 'Hide Chat Box';
+        const domainStates = result.domainStates || {};
+        const isEnabled = domainStates[domain] || false;
+        
+        if (isEnabled) {
+          status.textContent = 'Chat box is enabled';
+          toggleButton.textContent = 'Disable Chat Box';
         } else {
-          status.textContent = 'Chat box is hidden';
-          toggleButton.textContent = 'Show Chat Box';
+          status.textContent = 'Chat box is disabled';
+          toggleButton.textContent = 'Enable Chat Box';
         }
       });
     }, 100);

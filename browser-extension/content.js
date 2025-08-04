@@ -1,6 +1,14 @@
 console.log('Content script loaded');
 let chatBoxContainer = null;
 let isVisible = false;
+let currentDomain = null;
+
+// Get current domain
+try {
+  currentDomain = window.location.hostname;
+} catch (error) {
+  currentDomain = 'unknown';
+}
 
 function createChatBox() {
   if (chatBoxContainer) return;
@@ -164,7 +172,7 @@ function showChatBox() {
   }
   chatBoxContainer.style.display = 'flex';
   isVisible = true;
-  chrome.storage.local.set({ chatBoxVisible: true });
+  updateDomainState(true);
 }
 
 function hideChatBox() {
@@ -172,7 +180,15 @@ function hideChatBox() {
     chatBoxContainer.style.display = 'none';
   }
   isVisible = false;
-  chrome.storage.local.set({ chatBoxVisible: false });
+  updateDomainState(false);
+}
+
+function updateDomainState(enabled) {
+  chrome.storage.local.get(['domainStates'], (result) => {
+    const domainStates = result.domainStates || {};
+    domainStates[currentDomain] = enabled;
+    chrome.storage.local.set({ domainStates: domainStates });
+  });
 }
 
 function saveChatHistory() {
@@ -214,8 +230,10 @@ function clearChatHistory() {
   chrome.storage.local.set({ chatHistory: [] });
 }
 
-chrome.storage.local.get(['chatBoxVisible'], (result) => {
-  if (result.chatBoxVisible) {
+chrome.storage.local.get(['domainStates'], (result) => {
+  const domainStates = result.domainStates || {};
+  const isEnabled = domainStates[currentDomain] || false;
+  if (isEnabled) {
     showChatBox();
   }
 });
@@ -224,12 +242,18 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   console.log('Message received:', request);
   if (request.action === 'toggleChatBox') {
     console.log('Toggling chat box, current visibility:', isVisible);
+    
+    // Update domain if provided in message
+    if (request.domain && request.domain !== currentDomain) {
+      currentDomain = request.domain;
+    }
+    
     if (isVisible) {
       hideChatBox();
     } else {
       showChatBox();
     }
-    sendResponse({success: true, visible: isVisible});
+    sendResponse({success: true, visible: isVisible, domain: currentDomain});
   }
   return true;
 });

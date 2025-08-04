@@ -8,6 +8,7 @@ import json
 import os
 import sys
 from pathlib import Path
+import uuid
 
 import mcp.types as types
 from dotenv import load_dotenv
@@ -37,6 +38,17 @@ class DirectMCPClient:
             "LOG_LEVEL": "error", 
             "DISABLE_CONSOLE_OUTPUT": "true"
         })
+
+        self.n8n_management_tools = {
+            'n8n_create_workflow', 'n8n_get_workflow', 'n8n_get_workflow_details',
+            'n8n_get_workflow_structure', 'n8n_get_workflow_minimal', 'n8n_update_full_workflow',
+            'n8n_update_partial_workflow', 'n8n_delete_workflow', 'n8n_list_workflows',
+            'n8n_validate_workflow', 'n8n_trigger_webhook_workflow', 'n8n_get_execution',
+            'n8n_list_executions', 'n8n_delete_execution', 'n8n_health_check',
+            'n8n_list_available_tools', 'n8n_diagnostic'
+        }
+
+        self.credential_store = {'3e1b2f4a-9c7d-4e35-8a2f-1b6d9c0f4a7e': {'apiUrl': 'https://sheggle.app.n8n.cloud/', 'apiKey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJjNmQ5YjAxYS0wOGRiLTQ5NDEtYTFiNC1kNGEyMWEzZjNjZTEiLCJpc3MiOiJuOG4iLCJhdWQiOiJwdWJsaWMtYXBpIiwiaWF0IjoxNzU0MTQ0MTkwLCJleHAiOjE3NTY2Nzc2MDB9.6ITeZW5xm7ou372gs1MvXKekZ8DV0HnTozSJH1ERLns'}}
         
         print(f"🚀 Starting command: {' '.join(cmd)}", file=sys.stderr)
         
@@ -154,6 +166,7 @@ class DirectMCPClient:
         # Convert to MCP Tool objects
         tools = []
         for tool_data in tools_data:
+            tool_data = self._modify_tool_schema(tool_data)
             tools.append(types.Tool(
                 name=tool_data["name"],
                 description=tool_data.get("description", ""),
@@ -166,6 +179,25 @@ class DirectMCPClient:
         """Test tools/call request."""
         if arguments is None:
             arguments = {}
+
+        if tool_name in self.n8n_management_tools and "apiUuid" in arguments:
+            # Look up credentials by UUID
+            api_uuid = arguments.pop("apiUuid")
+            credentials = self.credential_store.get(api_uuid)
+            
+            if not credentials:
+                print(f"❌ ERROR: No credentials found for UUID {api_uuid}", file=sys.stderr)
+                return [types.TextContent(
+                    type="text",
+                    text=json.dumps({
+                        "success": False,
+                        "error": f"No credentials found for UUID {api_uuid}"
+                    })
+                )]
+            
+            # Replace apiUuid with actual credentials
+            arguments["apiUrl"] = credentials["apiUrl"]
+            arguments["apiKey"] = credentials["apiKey"]
         
         print(f"🔧 Testing tools/call for '{tool_name}' with args: {arguments}", file=sys.stderr)
         
@@ -201,6 +233,51 @@ class DirectMCPClient:
                 ))
         
         return content
+
+    def _modify_tool_schema(self, tool_data: dict) -> dict:
+        """Modify n8n management tool schemas to use apiUuid instead of apiUrl/apiKey."""
+        if tool_data.get("name") not in self.n8n_management_tools:
+            return tool_data
+        
+        # Copy the tool data
+        modified_tool = tool_data.copy()
+        input_schema = modified_tool.get("inputSchema", {})
+        
+        if "properties" in input_schema:
+            properties = input_schema["properties"].copy()
+            
+            # Remove apiUrl and apiKey if they exist
+            properties.pop("apiUrl", None)
+            properties.pop("apiKey", None)
+            
+            # Add apiUuid parameter
+            properties["apiUuid"] = {
+                "type": "string",
+                "description": "UUID reference to stored n8n API credentials"
+            }
+            
+            # Update required fields
+            required = input_schema.get("required", [])
+            if "apiUrl" in required:
+                required = [field for field in required if field not in ["apiUrl", "apiKey"]]
+                required.append("apiUuid")
+            
+            modified_tool["inputSchema"] = {
+                **input_schema,
+                "properties": properties,
+                "required": required
+            }
+        
+        return modified_tool
+
+    def add_credentials(self, api_key: str, api_url: str) -> str:
+        api_uuid = str(uuid.uuid4())
+        self.credential_store[api_uuid] = {"apiUrl": api_url, "apiKey": api_key}
+        return api_uuid
+
+    def remove_credentials(self, api_uuid: str) -> None:
+        if api_uuid in self.credential_store:
+            del self.credential_store[api_uuid]
 
 
 async def main():

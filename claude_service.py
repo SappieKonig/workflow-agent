@@ -25,7 +25,8 @@ openai_client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
 class ChatRequest(BaseModel):
     message: str
-    url: str = None
+    api_key: str
+    api_url: str
 
 def compress_response(claude_response: str) -> str:
     """Compress Claude's verbose response using OpenAI"""
@@ -64,14 +65,14 @@ async def chat(request: ChatRequest):
     try:
         # Add URL context if provided
         prompt = request.message
-        if request.url:
-            if "/workflow/" in request.url:
+        if request.api_url:
+            if "/workflow/" in request.api_url:
                 # Extract workflow ID from URL
-                workflow_id = request.url.split("/workflow/")[-1]
-                prompt = f"Context: User is currently viewing/editing workflow with ID: {workflow_id} on n8n at {request.url}\n\nPlease modify or update this existing workflow based on the user's request.\n\nUser request: {request.message}"
+                workflow_id = request.api_url.split("/workflow/")[-1]
+                prompt = f"Context: User is currently viewing/editing workflow with ID: {workflow_id} on n8n at {request.api_url}\n\nPlease modify or update this existing workflow based on the user's request.\n\nUser request: {request.message}"
             else:
-                prompt = f"Context: User is currently on this page: {request.url}\n\nPlease create a new workflow based on the user's request.\n\nUser request: {request.message}"
-        
+                prompt = f"Context: User is currently on this page: {request.api_url}\n\nPlease create a new workflow based on the user's request.\n\nUser request: {request.message}"
+
         result = subprocess.run(
             ["claude", "-p", prompt],
             capture_output=True,

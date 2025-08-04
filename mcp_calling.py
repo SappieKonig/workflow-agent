@@ -35,9 +35,7 @@ class DirectMCPClient:
         env.update({
             "MCP_MODE": "stdio",
             "LOG_LEVEL": "error", 
-            "DISABLE_CONSOLE_OUTPUT": "true",
-            "N8N_API_URL": os.getenv("N8N_API_URL", ""),
-            "N8N_API_KEY": os.getenv("N8N_API_KEY", "")
+            "DISABLE_CONSOLE_OUTPUT": "true"
         })
         
         print(f"🚀 Starting command: {' '.join(cmd)}", file=sys.stderr)

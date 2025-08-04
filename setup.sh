@@ -5,7 +5,7 @@ ABSOLUTE_PATH=$(pwd)
 # Setup n8n-mcp if directory doesn't exist
 if [ ! -d "n8n-mcp" ]; then
     echo "Setting up n8n-mcp..."
-    git clone https://github.com/czlonkowski/n8n-mcp.git
+    git clone git@github.com:SappieKonig/n8n-mcp.git
     cd n8n-mcp
     npm install
     npm run build

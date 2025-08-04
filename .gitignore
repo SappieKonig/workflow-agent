@@ -1,5 +1,6 @@
 n8n-mcp
 .claude
+!.claude/settings.json
 creds/
 
 # Byte-compiled / optimized / DLL files

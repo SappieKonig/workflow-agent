@@ -15,7 +15,7 @@ async def main():
     
     # Pass API credentials as tool arguments instead of environment variables
     workflows = await client.call_tool("n8n_list_workflows", {
-        "apiUuid": "9d3b6fdd-4b8f-4076-8b71-de549a54111c"
+        "apiUuid": "b9cad45b-05b0-43cb-ba2b-a747ca0b8d71"
     })
     
     for workflow in json.loads(workflows[0].text)['data']['workflows']:

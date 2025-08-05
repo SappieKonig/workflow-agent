@@ -84,6 +84,8 @@ async def chat(request: ChatRequest):
         request_uuid = uuid.uuid4()
         N8NCredential(api_key=request.api_key, api_url=request.api_url).write(cred_dir / f"{request_uuid}.json")
 
+        system_prompt = "Exclusively use the n8n-mcp tools."
+
         prompt = f"{system_prompt}\n\nThe UUID of this request with which you can call tools on the user's n8n is {request_uuid}\n\n{prompt}"
 
         print(f"Running claude command with UUID: {request_uuid}")
@@ -93,7 +95,7 @@ async def chat(request: ChatRequest):
             text=True,
             timeout=300
         )
-        
+
         if result.returncode == 0:
             claude_response = result.stdout.strip()
             print(f"Claude response: {claude_response}")

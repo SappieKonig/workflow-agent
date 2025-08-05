@@ -96,15 +96,31 @@ def revoke_token(token_id: int) -> bool:
 
 def check_token(token: str) -> bool:
     """Check if a token is valid."""
-    with get_session() as session:
-        active_tokens = session.query(AuthToken).filter(
-            AuthToken.revoked_at.is_(None)
-        ).all()
-        
-        for auth_token in active_tokens:
-            if bcrypt.checkpw(token.encode('utf-8'), auth_token.token_hash.encode('utf-8')):
-                return True
-        
+    # Early validation for empty/None tokens
+    if not token or not token.strip():
+        return False
+    
+    # Check if database exists
+    if not DB_PATH.exists():
+        return False
+    
+    try:
+        with get_session() as session:
+            active_tokens = session.query(AuthToken).filter(
+                AuthToken.revoked_at.is_(None)
+            ).all()
+            
+            for auth_token in active_tokens:
+                try:
+                    if bcrypt.checkpw(token.encode('utf-8'), auth_token.token_hash.encode('utf-8')):
+                        return True
+                except (ValueError, TypeError):
+                    # Handle any bcrypt errors gracefully
+                    continue
+            
+            return False
+    except Exception:
+        # Handle any database connection or query errors
         return False
 
 

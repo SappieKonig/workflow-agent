@@ -38,8 +38,12 @@ class ChatRequest(BaseModel):
 
 def validate_auth_token(token: str) -> bool:
     """Validate auth token against the database."""
-    from auth_cli import check_token
-    return check_token(token)
+    try:
+        from auth_cli import check_token
+        return check_token(token)
+    except Exception:
+        # If there's any error importing or running check_token, deny access
+        return False
 
 
 def compress_response(claude_response: str) -> str:
@@ -77,7 +81,11 @@ def compress_response(claude_response: str) -> str:
 @app.post("/chat")
 async def chat(request: ChatRequest):
     try:
-        # Validate auth token first
+        # Validate auth token input first
+        if not request.auth_token or not request.auth_token.strip():
+            raise HTTPException(status_code=401, detail="Authentication token is required")
+        
+        # Validate auth token against database
         if not validate_auth_token(request.auth_token):
             raise HTTPException(status_code=401, detail="Invalid or expired authentication token")
         

@@ -3,11 +3,37 @@ document.addEventListener('DOMContentLoaded', () => {
   const toggleButton = document.getElementById('toggleButton');
   const status = document.getElementById('status');
   const currentDomain = document.getElementById('currentDomain');
+  const apiKeyInput = document.getElementById('apiKey');
+  const saveConfigButton = document.getElementById('saveConfig');
 
-  if (!toggleButton || !status || !currentDomain) {
+  if (!toggleButton || !status || !currentDomain || !apiKeyInput || !saveConfigButton) {
     console.error('Could not find required elements');
     return;
   }
+
+  // Load saved configuration
+  chrome.storage.local.get(['apiKey'], (result) => {
+    if (result.apiKey) {
+      apiKeyInput.value = result.apiKey;
+    }
+  });
+
+  // Save configuration
+  saveConfigButton.addEventListener('click', () => {
+    const apiKey = apiKeyInput.value.trim();
+    
+    if (!apiKey) {
+      status.textContent = 'Please enter your API key';
+      return;
+    }
+    
+    chrome.storage.local.set({ apiKey }, () => {
+      status.textContent = 'API key saved';
+      setTimeout(() => {
+        status.textContent = 'Ready';
+      }, 2000);
+    });
+  });
 
   // Get current tab info first
   chrome.tabs.query({active: true, currentWindow: true}, (tabs) => {

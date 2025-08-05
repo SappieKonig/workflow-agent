@@ -93,42 +93,64 @@ async function sendMessage() {
   
   saveChatHistory();
   
-  try {
-    const response = await fetch(CONFIG.SERVICE_URL, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ 
-        message: message,
-        url: window.location.href
-      })
-    });
-    
-    // Remove loading message
-    removeLoadingMessage(loadingMessage);
-    
-    if (response.ok) {
-      const data = await response.json();
-      addMessage(data.response, 'assistant');
-      
-      // Add notification about reload and then reload the page
-      setTimeout(() => {
-        addMessage('Reloading page to show workflow...', 'assistant');
-        setTimeout(() => {
-          window.location.reload();
-        }, 2000);
-      }, 1000);
-    } else {
-      addMessage('Error: Failed to get response from Claude service', 'assistant');
+  // Get API key from storage
+  chrome.storage.local.get(['apiKey'], async (result) => {
+    if (!result.apiKey) {
+      removeLoadingMessage(loadingMessage);
+      addMessage('Error: API key not configured. Please configure it in the extension popup.', 'assistant');
+      return;
     }
-  } catch (error) {
-    // Remove loading message on error
-    removeLoadingMessage(loadingMessage);
-    addMessage('Error: Could not connect to Claude service. Make sure the service is running.', 'assistant');
-  }
-  
-  saveChatHistory();
+    
+    // Deduce API URL from current page URL
+    let apiUrl = '';
+    try {
+      const currentUrl = new URL(window.location.href);
+      // Extract the base URL (protocol + hostname)
+      apiUrl = `${currentUrl.protocol}//${currentUrl.hostname}/`;
+    } catch (error) {
+      removeLoadingMessage(loadingMessage);
+      addMessage('Error: Could not determine API URL from current page.', 'assistant');
+      return;
+    }
+    
+    try {
+      const response = await fetch(CONFIG.SERVICE_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ 
+          message: message,
+          api_key: result.apiKey,
+          api_url: apiUrl
+        })
+      });
+      
+      // Remove loading message
+      removeLoadingMessage(loadingMessage);
+      
+      if (response.ok) {
+        const data = await response.json();
+        addMessage(data.response, 'assistant');
+        
+        // Add notification about reload and then reload the page
+        setTimeout(() => {
+          addMessage('Reloading page to show workflow...', 'assistant');
+          setTimeout(() => {
+            window.location.reload();
+          }, 2000);
+        }, 1000);
+      } else {
+        addMessage('Error: Failed to get response from Claude service', 'assistant');
+      }
+    } catch (error) {
+      // Remove loading message on error
+      removeLoadingMessage(loadingMessage);
+      addMessage('Error: Could not connect to Claude service. Make sure the service is running.', 'assistant');
+    }
+    
+    saveChatHistory();
+  });
 }
 
 function addMessage(text, sender) {

@@ -1,5 +1,7 @@
 import asyncio
 import os
+import csv
+from datetime import datetime
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
@@ -35,6 +37,9 @@ class ChatRequest(BaseModel):
     auth_token: str
     api_key: str
     api_url: str
+
+class FeedbackRequest(BaseModel):
+    feedback: str
 
 def validate_auth_token(token: str) -> bool:
     """Validate auth token against the database."""
@@ -140,6 +145,29 @@ async def chat(request: ChatRequest):
     finally:
         if os.path.exists(cred_dir / f"{request_uuid}.json"):
             os.remove(cred_dir / f"{request_uuid}.json")
+
+@app.post("/feedback")
+async def submit_feedback(request: FeedbackRequest):
+    """Submit user feedback to CSV file."""
+    feedback_file = base_dir / "feedback.csv"
+    
+    # Create CSV with headers if it doesn't exist
+    file_exists = feedback_file.exists()
+    
+    with open(feedback_file, 'a', newline='', encoding='utf-8') as f:
+        writer = csv.writer(f)
+        
+        # Write headers if new file
+        if not file_exists:
+            writer.writerow(['timestamp', 'feedback'])
+        
+        # Write feedback with timestamp
+        writer.writerow([
+            datetime.now().isoformat(),
+            request.feedback
+        ])
+    
+    return {"status": "success", "message": "Thank you for your feedback!"}
 
 @app.get("/health")
 async def health():

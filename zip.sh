@@ -1,0 +1,1 @@
+zip -r wa-extension.zip browser-extension

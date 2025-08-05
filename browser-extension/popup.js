@@ -172,4 +172,55 @@ document.addEventListener('DOMContentLoaded', () => {
       });
     }, 100);
   }
+  
+  // Feedback functionality
+  const feedbackToggle = document.getElementById('feedbackToggle');
+  const feedbackForm = document.getElementById('feedbackForm');
+  const feedbackText = document.getElementById('feedbackText');
+  const submitFeedback = document.getElementById('submitFeedback');
+  
+  feedbackToggle.addEventListener('click', () => {
+    feedbackForm.style.display = feedbackForm.style.display === 'none' ? 'block' : 'none';
+    if (feedbackForm.style.display === 'block') {
+      feedbackText.focus();
+    }
+  });
+  
+  submitFeedback.addEventListener('click', async () => {
+    const feedback = feedbackText.value.trim();
+    
+    if (!feedback) {
+      status.textContent = 'Please enter feedback';
+      return;
+    }
+    
+    submitFeedback.disabled = true;
+    submitFeedback.textContent = 'Sending...';
+    
+    try {
+      const response = await fetch(CONFIG.SERVICE_URL.replace('/chat', '/feedback'), {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ feedback })
+      });
+      
+      if (response.ok) {
+        status.textContent = 'Feedback sent! Thank you!';
+        feedbackText.value = '';
+        setTimeout(() => {
+          feedbackForm.style.display = 'none';
+          status.textContent = 'Ready';
+        }, 2000);
+      } else {
+        status.textContent = 'Failed to send feedback';
+      }
+    } catch (error) {
+      status.textContent = 'Error sending feedback';
+    } finally {
+      submitFeedback.disabled = false;
+      submitFeedback.textContent = 'Submit Feedback';
+    }
+  });
 });

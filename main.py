@@ -1,5 +1,4 @@
-import subprocess
-import json
+import asyncio
 import os
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -89,29 +88,39 @@ async def chat(request: ChatRequest):
         prompt = f"{system_prompt}\n\nThe UUID of this request with which you can call tools on the user's n8n is {request_uuid}\n\n{prompt}"
 
         print(f"Running claude command with UUID: {request_uuid}")
-        result = subprocess.run(
-            ["claude", "-p", prompt],
-            capture_output=True,
-            text=True,
-            timeout=300
+        
+        # Use async subprocess to avoid blocking the server
+        process = await asyncio.create_subprocess_exec(
+            "claude", "-p", prompt,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE
         )
-
-        if result.returncode == 0:
-            claude_response = result.stdout.strip()
+        
+        try:
+            stdout, stderr = await asyncio.wait_for(
+                process.communicate(), 
+                timeout=300
+            )
+        except asyncio.TimeoutError:
+            process.kill()
+            await process.wait()
+            raise HTTPException(status_code=408, detail="Request timeout")
+        
+        if process.returncode == 0:
+            claude_response = stdout.decode().strip()
             print(f"Claude response: {claude_response}")
             return {"response": claude_response}
         else:
-            return {"response": f"Error: {result.stderr.strip()}"}
+            return {"response": f"Error: {stderr.decode().strip()}"}
             
-    except subprocess.TimeoutExpired:
-        raise HTTPException(status_code=408, detail="Request timeout")
     except FileNotFoundError:
         raise HTTPException(status_code=500, detail="Claude CLI not found")
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
     finally:
-        os.remove(cred_dir / f"{request_uuid}.json")
+        if os.path.exists(cred_dir / f"{request_uuid}.json"):
+            os.remove(cred_dir / f"{request_uuid}.json")
 
 @app.get("/health")
 async def health():

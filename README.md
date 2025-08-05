@@ -1,104 +1,152 @@
-# Right Side Chatbox Extension
+# Workflow Agent
 
-A browser extension that provides a chat interface on the right side of web pages, integrated with Claude AI for workflow automation.
+A workflow automation system that bridges n8n with Claude AI through a browser extension and FastAPI service. This tool enables users to create, edit, and manage n8n workflows using natural language through Claude AI.
 
-## Setup
+## Overview
 
-### Prerequisites
+The Workflow Agent consists of three main components:
+- **Browser Extension**: A Chrome extension providing a chat interface for interacting with Claude AI
+- **FastAPI Service**: A Python backend that connects the browser extension to Claude CLI and n8n
+- **n8n-mcp Integration**: MCP (Model Context Protocol) tools for direct n8n API interaction
+
+## Prerequisites
+
 - Python 3.10+
 - uv (Python package manager)
 - Chrome/Chromium browser
 - Claude CLI installed and configured
-- OpenAI API key (for response compression)
+- n8n instance with API access
+- OpenAI API key (optional, for response compression)
 
-### 1. Environment Configuration
+## Quick Start
 
-Copy the example environment file:
-```bash
-cp .env.example .env
+1. **Clone the repository**:
+   ```bash
+   git clone <repository-url>
+   cd workflow_agent
+   ```
+
+2. **Run the setup script**:
+   ```bash
+   ./setup.sh
+   ```
+   This will:
+   - Install n8n-mcp and dependencies
+   - Configure Claude Code integration
+   - Set up the Python environment
+
+3. **Configure environment variables**:
+   ```bash
+   cp .env.example .env
+   # Edit .env with your API keys and URLs
+   ```
+
+4. **Generate browser extension config**:
+   ```bash
+   uv run generate_browser_config.py
+   ```
+
+5. **Install the browser extension**:
+   - Open Chrome and navigate to `chrome://extensions/`
+   - Enable "Developer mode"
+   - Click "Load unpacked" and select the `browser-extension` folder
+
+6. **Start the service**:
+   ```bash
+   uv run main.py
+   ```
+
+## Architecture
+
+```
+Browser Extension ↔ FastAPI Service ↔ Claude CLI ↔ n8n-mcp ↔ n8n API
 ```
 
-Edit `.env` and configure the following variables:
+### Components
+
+- **Browser Extension** (`browser-extension/`): Chrome extension with chat UI
+- **FastAPI Service** (`main.py`): Python backend handling requests
+- **n8n-mcp** (`n8n-mcp/`): MCP server providing n8n tools to Claude
+- **MCP Proxy** (`mcp_proxy.py`): Alternative proxy implementation
+- **Credentials Manager** (`n8n_credential.py`): Secure credential handling
+
+## Usage
+
+1. Click the extension icon in Chrome
+2. Click "Show Chat Box" to open the interface
+3. Type natural language commands to:
+   - Create new workflows: "Create a workflow that sends Slack notifications"
+   - Edit existing workflows: "Add error handling to the current workflow"
+   - Query workflow status: "Show me recent executions"
+
+## Configuration
+
+### Environment Variables
+
+Create a `.env` file with:
 ```bash
 N8N_API_KEY=your_n8n_api_key
 N8N_API_URL=https://your-n8n-instance.com
 CLAUDE_SERVICE_TARGET=http://127.0.0.1:8000/chat
-OPENAI_API_KEY=your_openai_api_key
+OPENAI_API_KEY=your_openai_api_key  # Optional
 MCP_MODE=stdio
 LOG_LEVEL=error
 DISABLE_CONSOLE_OUTPUT=true
 ```
 
-### 2. Install n8n-mcp and Configure Claude Code
+### Browser Extension Configuration
 
-Run the setup script to install n8n-mcp and add it to Claude Code:
-```bash
-./setup.sh
-```
-
-This script will:
-- Clone the n8n-mcp repository if it doesn't exist
-- Clone the n8n-docs repository for documentation
-- Install npm dependencies and build the project
-- Add the n8n-mcp server to Claude Code with your environment variables
-
-### 3. Generate Browser Extension Config
-
-Generate the browser extension configuration from environment variables:
+The browser extension configuration is auto-generated from environment variables:
 ```bash
 uv run generate_browser_config.py
 ```
 
-This creates `browser-extension/config.js` with the correct service URL.
+## Development
 
-### 4. Install Browser Extension
+### Project Structure
 
-1. Open Chrome and navigate to `chrome://extensions/`
-2. Enable "Developer mode" (toggle in top-right)
-3. Click "Load unpacked"
-4. Select the `browser-extension` folder
-5. The extension should now appear in your extensions list
+```
+workflow_agent/
+├── browser-extension/      # Chrome extension files
+├── n8n-mcp/               # n8n MCP server (submodule)
+├── creds/                 # Temporary credential storage
+├── main.py                # FastAPI service
+├── mcp_proxy.py          # Alternative MCP proxy
+├── n8n_credential.py     # Credential management
+├── setup.sh              # Setup script
+└── test.sh               # Test script
+```
 
-### 5. Start the Claude Service
+### Testing
 
-Start the FastAPI service that bridges the browser extension to Claude:
+Run tests with:
 ```bash
-uv run claude_service.py
+./test.sh
 ```
 
-The service will run on `http://127.0.0.1:8000` by default.
+### MCP Tools
 
-### 6. Usage
+The n8n-mcp integration provides tools for:
+- Node discovery and documentation
+- Workflow creation and management
+- Workflow validation
+- Template search and usage
+- n8n API operations
 
-1. Navigate to any webpage
-2. Click the extension icon in your browser toolbar
-3. Click "Show Chat Box" to display the chat interface
-4. Type your message and press Enter or click Send
-5. The extension will send your request to Claude and display the response
+## Security
 
-## Configuration Updates
+- API credentials are stored temporarily and deleted after use
+- All communication is local (localhost) by default
+- Browser extension only communicates with configured service URL
+- Credentials are never exposed to the browser
 
-When you change `CLAUDE_SERVICE_TARGET` in `.env`, run the config generator again:
-```bash
-uv run generate_browser_config.py
-```
+## Troubleshooting
 
-Then reload the extension in Chrome to pick up the new configuration.
+1. **Extension not loading**: Ensure Developer mode is enabled in Chrome
+2. **Claude CLI errors**: Verify Claude CLI is installed and in PATH
+3. **n8n connection issues**: Check API key and URL in `.env`
+4. **MCP tools not available**: Run `./setup.sh` again to reconfigure
 
-## Features
+## License
 
-- Right-side chat interface on any webpage
-- Integration with Claude AI via FastAPI service
-- Context-aware: passes current page URL to Claude
-- Workflow detection: recognizes n8n workflow pages for targeted assistance
-- Response compression via OpenAI for better UX
-- Persistent chat history using Chrome storage
-- Auto-resizing input textarea
-
-## Architecture
-
-```
-Browser Extension � FastAPI Service (claude_service.py) � Claude CLI � n8n API
-```
-
-The browser extension communicates with a local FastAPI service, which in turn uses the Claude CLI to process requests and interact with n8n workflows.
+See LICENSE file for details.

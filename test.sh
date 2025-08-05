@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Make curl request to claude_service.py on port 8000
-curl -X POST http://localhost:8000/chat \
+curl -X POST https://api.automaton.fit/chat \
   -H "Content-Type: application/json" \
   -d '{
     "message": "Create a workflow that forwards mails I get to automaton.mailtesting@gmail.com. Be sure to sync the workflow to my n8n instance, do not ask for confirmation.",

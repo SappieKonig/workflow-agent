@@ -122,11 +122,16 @@
   
   <div class="config-section">
     <div class="input-group">
-      <label class="input-label" for="apiKey">API Key</label>
+      <label class="input-label" for="authToken">Service Auth Token</label>
+      <input type="password" id="authToken" class="input-field" placeholder="Enter your service auth token">
+    </div>
+    
+    <div class="input-group">
+      <label class="input-label" for="apiKey">n8n API Key</label>
       <input type="text" id="apiKey" class="input-field" placeholder="Enter your n8n API key">
     </div>
     
-    <button id="saveConfig" class="save-button">Save API Key</button>
+    <button id="saveConfig" class="save-button">Save Configuration</button>
   </div>
   
   <button id="toggleButton" class="toggle-button">

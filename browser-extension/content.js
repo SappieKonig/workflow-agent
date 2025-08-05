@@ -93,11 +93,17 @@ async function sendMessage() {
   
   saveChatHistory();
   
-  // Get API key from storage
-  chrome.storage.local.get(['apiKey'], async (result) => {
+  // Get configuration from storage
+  chrome.storage.local.get(['authToken', 'apiKey'], async (result) => {
+    if (!result.authToken) {
+      removeLoadingMessage(loadingMessage);
+      addMessage('Error: Service auth token not configured. Please configure it in the extension popup.', 'assistant');
+      return;
+    }
+    
     if (!result.apiKey) {
       removeLoadingMessage(loadingMessage);
-      addMessage('Error: API key not configured. Please configure it in the extension popup.', 'assistant');
+      addMessage('Error: n8n API key not configured. Please configure it in the extension popup.', 'assistant');
       return;
     }
     
@@ -121,6 +127,7 @@ async function sendMessage() {
         },
         body: JSON.stringify({ 
           message: message,
+          auth_token: result.authToken,
           api_key: result.apiKey,
           api_url: apiUrl
         })

@@ -3,16 +3,20 @@ document.addEventListener('DOMContentLoaded', () => {
   const toggleButton = document.getElementById('toggleButton');
   const status = document.getElementById('status');
   const currentDomain = document.getElementById('currentDomain');
+  const authTokenInput = document.getElementById('authToken');
   const apiKeyInput = document.getElementById('apiKey');
   const saveConfigButton = document.getElementById('saveConfig');
 
-  if (!toggleButton || !status || !currentDomain || !apiKeyInput || !saveConfigButton) {
+  if (!toggleButton || !status || !currentDomain || !authTokenInput || !apiKeyInput || !saveConfigButton) {
     console.error('Could not find required elements');
     return;
   }
 
   // Load saved configuration
-  chrome.storage.local.get(['apiKey'], (result) => {
+  chrome.storage.local.get(['authToken', 'apiKey'], (result) => {
+    if (result.authToken) {
+      authTokenInput.value = result.authToken;
+    }
     if (result.apiKey) {
       apiKeyInput.value = result.apiKey;
     }
@@ -20,15 +24,21 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Save configuration
   saveConfigButton.addEventListener('click', () => {
+    const authToken = authTokenInput.value.trim();
     const apiKey = apiKeyInput.value.trim();
     
-    if (!apiKey) {
-      status.textContent = 'Please enter your API key';
+    if (!authToken) {
+      status.textContent = 'Please enter your service auth token';
       return;
     }
     
-    chrome.storage.local.set({ apiKey }, () => {
-      status.textContent = 'API key saved';
+    if (!apiKey) {
+      status.textContent = 'Please enter your n8n API key';
+      return;
+    }
+    
+    chrome.storage.local.set({ authToken, apiKey }, () => {
+      status.textContent = 'Configuration saved';
       setTimeout(() => {
         status.textContent = 'Ready';
       }, 2000);

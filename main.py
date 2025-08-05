@@ -32,8 +32,15 @@ openai_client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
 class ChatRequest(BaseModel):
     message: str
+    auth_token: str
     api_key: str
     api_url: str
+
+def validate_auth_token(token: str) -> bool:
+    """Validate auth token against the database."""
+    from auth_cli import check_token
+    return check_token(token)
+
 
 def compress_response(claude_response: str) -> str:
     """Compress Claude's verbose response using OpenAI"""
@@ -54,7 +61,7 @@ def compress_response(claude_response: str) -> str:
             temperature=0
         )
         return response.choices[0].message.content.strip()
-    except Exception as e:
+    except Exception:
         # Fallback: try to extract workflow ID manually if OpenAI fails
         import re
         id_match = re.search(r'ID[:\s]*([A-Za-z0-9_-]+)', claude_response)
@@ -70,6 +77,10 @@ def compress_response(claude_response: str) -> str:
 @app.post("/chat")
 async def chat(request: ChatRequest):
     try:
+        # Validate auth token first
+        if not validate_auth_token(request.auth_token):
+            raise HTTPException(status_code=401, detail="Invalid or expired authentication token")
+        
         # Add URL context if provided
         prompt = request.message
         if request.api_url:

@@ -2,6 +2,7 @@ n8n-mcp
 .claude
 !.claude/settings.json
 creds/
+auth_tokens.db
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

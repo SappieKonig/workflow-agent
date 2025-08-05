@@ -198,7 +198,11 @@ document.addEventListener('DOMContentLoaded', () => {
     submitFeedback.textContent = 'Sending...';
     
     try {
-      const response = await fetch(CONFIG.SERVICE_URL.replace('/chat', '/feedback'), {
+      const feedbackUrl = CONFIG.SERVICE_URL.replace('/chat', '/feedback');
+      console.log('Sending feedback to:', feedbackUrl);
+      console.log('Feedback data:', { feedback });
+      
+      const response = await fetch(feedbackUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -206,7 +210,11 @@ document.addEventListener('DOMContentLoaded', () => {
         body: JSON.stringify({ feedback })
       });
       
+      console.log('Response status:', response.status);
+      
       if (response.ok) {
+        const data = await response.json();
+        console.log('Success response:', data);
         status.textContent = 'Feedback sent! Thank you!';
         feedbackText.value = '';
         setTimeout(() => {
@@ -214,9 +222,13 @@ document.addEventListener('DOMContentLoaded', () => {
           status.textContent = 'Ready';
         }, 2000);
       } else {
+        console.error('Failed response:', response.status, response.statusText);
+        const errorText = await response.text();
+        console.error('Error body:', errorText);
         status.textContent = 'Failed to send feedback';
       }
     } catch (error) {
+      console.error('Fetch error:', error);
       status.textContent = 'Error sending feedback';
     } finally {
       submitFeedback.disabled = false;

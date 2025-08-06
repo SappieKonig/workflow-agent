@@ -296,11 +296,7 @@ async def chat_stream(request: ChatRequest):
                             # Send todo update as progress update
                             yield f"data: {json.dumps({'type': 'progress-update', 'data': todo_message})}\n\n"
                         
-                        # Also send message ID as progress update
-                        message = event.get("message", {})
-                        message_id = message.get("id", "")
-                        if message_id:
-                            yield f"data: {json.dumps({'type': 'progress-update', 'data': message_id})}\n\n"
+                        # Don't send message IDs anymore - only todo updates
                     
                     elif event_type == "result":
                         # Send final result with session_id in data

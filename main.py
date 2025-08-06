@@ -3,6 +3,7 @@ import os
 import csv
 import json
 from datetime import datetime
+from typing import Optional
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
@@ -38,7 +39,7 @@ class ChatRequest(BaseModel):
     auth_token: str
     api_key: str
     api_url: str
-    session_id: str = None
+    session_id: Optional[str] = None
 
 class FeedbackRequest(BaseModel):
     feedback: str

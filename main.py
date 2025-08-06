@@ -178,11 +178,11 @@ async def chat_stream(request: ChatRequest):
         try:
             # Validate auth token
             if not request.auth_token or not request.auth_token.strip():
-                yield f"data: {json.dumps({'error': 'Authentication token is required'})}\n\n"
+                yield f'data: {json.dumps({"error": "Authentication token is required"})}\n\n'
                 return
             
             if not validate_auth_token(request.auth_token):
-                yield f"data: {json.dumps({'error': 'Invalid or expired authentication token'})}\n\n"
+                yield f'data: {json.dumps({"error": "Invalid or expired authentication token"})}\n\n'
                 return
             
             # Prepare prompt with context
@@ -196,8 +196,8 @@ async def chat_stream(request: ChatRequest):
             
             # Store credentials temporarily
             request_uuid = str(uuid.uuid4())
-            credential = N8NCredential(request.api_key, request.api_url)
-            credential.save_to_file(cred_dir / f"{request_uuid}.json")
+            credential = N8NCredential(api_key=request.api_key, api_url=request.api_url)
+            credential.write(cred_dir / f"{request_uuid}.json")
             
             system_prompt = """You are an n8n workflow creation and management expert. You have access to tools to create, update, and manage n8n workflows via API."""
             prompt = f"{system_prompt}\n\nThe UUID of this request with which you can call tools on the user's n8n is {request_uuid}\n\n{prompt}"

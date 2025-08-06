@@ -180,29 +180,32 @@ async function sendMessage() {
           if (line.startsWith('data: ')) {
             const dataStr = line.slice(6);
             
-            // Try to parse as JSON first (for result/error messages)
+            // Parse JSON message
             try {
-              const data = JSON.parse(dataStr);
+              const message = JSON.parse(dataStr);
               
-              if (data.type === 'result') {
+              if (message.type === 'result') {
+                // Parse the data field which contains text and session_id
+                const resultData = JSON.parse(message.data);
                 // Final result - remove loading and show final message
                 removeLoadingMessage(loadingMessage);
-                addMessage(data.text, 'assistant');
-                sessionIdReceived = data.session_id;
-              } else if (data.type === 'error') {
+                addMessage(resultData.text, 'assistant');
+                sessionIdReceived = resultData.session_id;
+              } else if (message.type === 'error') {
                 removeLoadingMessage(loadingMessage);
-                addMessage(`Error: ${data.message}`, 'assistant');
+                addMessage(`Error: ${message.data}`, 'assistant');
                 return;
-              }
-            } catch (e) {
-              // Not JSON, must be a message ID
-              if (dataStr && loadingMessage) {
-                // Update the loading text with the message ID
-                const loadingText = loadingMessage.querySelector('.loading-text');
-                if (loadingText) {
-                  loadingText.textContent = dataStr;
+              } else if (message.type === 'progress-update') {
+                // Progress update (message ID or todo update)
+                if (loadingMessage) {
+                  const loadingText = loadingMessage.querySelector('.loading-text');
+                  if (loadingText) {
+                    loadingText.textContent = message.data;
+                  }
                 }
               }
+            } catch (e) {
+              console.error('Failed to parse stream message:', e, dataStr);
             }
           }
         }

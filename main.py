@@ -3,7 +3,7 @@ import os
 import csv
 import json
 from datetime import datetime
-from typing import Optional
+from typing import Optional, Dict, List
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
@@ -54,6 +54,66 @@ def validate_auth_token(token: str) -> bool:
         # If there's any error importing or running check_token, deny access
         return False
 
+
+def rephrase_to_active_form(text: str) -> str:
+    """Use GPT-4o to rephrase todo items to active form."""
+    try:
+        response = openai_client.chat.completions.create(
+            model="gpt-4o",
+            messages=[
+                {
+                    "role": "system",
+                    "content": "Convert the following task description to active/progressive form (present continuous tense). Keep it concise and clear. Examples:\n'Research available nodes' -> 'Researching available nodes'\n'Create workflow' -> 'Creating workflow'\n'Validate configuration' -> 'Validating configuration'"
+                },
+                {
+                    "role": "user",
+                    "content": text
+                }
+            ],
+            max_tokens=50,
+            temperature=0
+        )
+        return response.choices[0].message.content.strip()
+    except Exception:
+        # Fallback: simple conversion
+        if text.startswith(('Create', 'Add', 'Remove', 'Update', 'Delete', 'Check', 'Validate', 'Test', 'Research', 'Design', 'Implement', 'Configure', 'Setup', 'Build')):
+            return text.replace('Create', 'Creating').replace('Add', 'Adding').replace('Remove', 'Removing').replace('Update', 'Updating').replace('Delete', 'Deleting').replace('Check', 'Checking').replace('Validate', 'Validating').replace('Test', 'Testing').replace('Research', 'Researching').replace('Design', 'Designing').replace('Implement', 'Implementing').replace('Configure', 'Configuring').replace('Setup', 'Setting up').replace('Build', 'Building')
+        return f"Working on: {text}"
+
+class TodoTracker:
+    """Track todo items and detect status changes."""
+    def __init__(self):
+        self.previous_todos: Dict[str, str] = {}  # id -> status
+        
+    def process_todo_event(self, event: dict) -> Optional[str]:
+        """Process TodoWrite events and return message if item became in_progress."""
+        message = event.get("message", {})
+        content = message.get("content", [])
+        
+        for item in content:
+            if item.get("type") == "tool_use" and item.get("name") == "TodoWrite":
+                todos = item.get("input", {}).get("todos", [])
+                
+                for todo in todos:
+                    todo_id = todo.get("id")
+                    status = todo.get("status")
+                    content_text = todo.get("content")
+                    
+                    # Check if this todo just became in_progress
+                    if todo_id and status == "in_progress":
+                        prev_status = self.previous_todos.get(todo_id)
+                        if prev_status != "in_progress":
+                            # New in_progress item detected
+                            self.previous_todos[todo_id] = status
+                            # Rephrase to active form
+                            active_text = rephrase_to_active_form(content_text)
+                            return active_text
+                    
+                    # Update status tracking
+                    if todo_id:
+                        self.previous_todos[todo_id] = status
+        
+        return None
 
 def compress_response(claude_response: str) -> str:
     """Compress Claude's verbose response using OpenAI"""
@@ -178,11 +238,11 @@ async def chat_stream(request: ChatRequest):
         try:
             # Validate auth token
             if not request.auth_token or not request.auth_token.strip():
-                yield f'data: {json.dumps({"error": "Authentication token is required"})}\n\n'
+                yield f'data: {json.dumps({"type": "error", "data": "Authentication token is required"})}\n\n'
                 return
             
             if not validate_auth_token(request.auth_token):
-                yield f'data: {json.dumps({"error": "Invalid or expired authentication token"})}\n\n'
+                yield f'data: {json.dumps({"type": "error", "data": "Invalid or expired authentication token"})}\n\n'
                 return
             
             # Prepare prompt with context
@@ -214,6 +274,9 @@ async def chat_stream(request: ChatRequest):
                 stderr=asyncio.subprocess.PIPE
             )
             
+            # Initialize todo tracker
+            todo_tracker = TodoTracker()
+            
             # Stream stdout line by line
             while True:
                 line = await process.stdout.readline()
@@ -225,17 +288,27 @@ async def chat_stream(request: ChatRequest):
                     event = json.loads(line.decode().strip())
                     event_type = event.get("type")
                     
-                    # Filter and send relevant events
+                    # Check for TodoWrite events
                     if event_type == "assistant":
-                        # Extract and send just the message ID
+                        # Process todo events
+                        todo_message = todo_tracker.process_todo_event(event)
+                        if todo_message:
+                            # Send todo update as progress update
+                            yield f"data: {json.dumps({'type': 'progress-update', 'data': todo_message})}\n\n"
+                        
+                        # Also send message ID as progress update
                         message = event.get("message", {})
                         message_id = message.get("id", "")
                         if message_id:
-                            yield f"data: {message_id}\n\n"
+                            yield f"data: {json.dumps({'type': 'progress-update', 'data': message_id})}\n\n"
                     
                     elif event_type == "result":
-                        # Send final result
-                        yield f"data: {json.dumps({'type': 'result', 'text': event.get('result', ''), 'session_id': event.get('session_id')})}\n\n"
+                        # Send final result with session_id in data
+                        result_data = {
+                            'text': event.get('result', ''),
+                            'session_id': event.get('session_id')
+                        }
+                        yield f"data: {json.dumps({'type': 'result', 'data': json.dumps(result_data)})}\n\n"
                 
                 except json.JSONDecodeError:
                     # Skip non-JSON lines
@@ -248,11 +321,10 @@ async def chat_stream(request: ChatRequest):
             if os.path.exists(cred_dir / f"{request_uuid}.json"):
                 os.remove(cred_dir / f"{request_uuid}.json")
             
-            # Send done event
-            yield f"data: {json.dumps({'type': 'done'})}\n\n"
+            # Stream ends naturally, no explicit done event needed
             
         except Exception as e:
-            yield f"data: {json.dumps({'type': 'error', 'message': str(e)})}\n\n"
+            yield f"data: {json.dumps({'type': 'error', 'data': str(e)})}\n\n"
     
     return StreamingResponse(
         generate_sse(),

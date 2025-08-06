@@ -6,6 +6,7 @@ from datetime import datetime
 from typing import Optional
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from openai import OpenAI
 import uuid
@@ -169,6 +170,104 @@ async def chat(request: ChatRequest):
     finally:
         if os.path.exists(cred_dir / f"{request_uuid}.json"):
             os.remove(cred_dir / f"{request_uuid}.json")
+
+@app.post("/chat/stream")
+async def chat_stream(request: ChatRequest):
+    """Stream Claude's response using Server-Sent Events."""
+    async def generate_sse():
+        try:
+            # Validate auth token
+            if not request.auth_token or not request.auth_token.strip():
+                yield f"data: {json.dumps({'error': 'Authentication token is required'})}\n\n"
+                return
+            
+            if not validate_auth_token(request.auth_token):
+                yield f"data: {json.dumps({'error': 'Invalid or expired authentication token'})}\n\n"
+                return
+            
+            # Prepare prompt with context
+            prompt = request.message
+            if request.api_url:
+                if "/workflow/" in request.api_url:
+                    workflow_id = request.api_url.split("/workflow/")[-1].split("/")[0]
+                    prompt = f"I'm on n8n workflow page with ID: {workflow_id}\n\n{prompt}"
+                else:
+                    prompt = f"I'm on n8n page: {request.api_url}\n\n{prompt}"
+            
+            # Store credentials temporarily
+            request_uuid = str(uuid.uuid4())
+            credential = N8NCredential(request.api_key, request.api_url)
+            credential.save_to_file(cred_dir / f"{request_uuid}.json")
+            
+            system_prompt = """You are an n8n workflow creation and management expert. You have access to tools to create, update, and manage n8n workflows via API."""
+            prompt = f"{system_prompt}\n\nThe UUID of this request with which you can call tools on the user's n8n is {request_uuid}\n\n{prompt}"
+            
+            # Build Claude command with streaming JSON output
+            claude_cmd = ["claude", "-p", prompt, "--output-format", "stream-json", "--verbose"]
+            if request.session_id:
+                claude_cmd.extend(["--resume", request.session_id])
+            
+            # Start subprocess
+            process = await asyncio.create_subprocess_exec(
+                *claude_cmd,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE
+            )
+            
+            # Stream stdout line by line
+            while True:
+                line = await process.stdout.readline()
+                if not line:
+                    break
+                
+                try:
+                    # Parse JSON line
+                    event = json.loads(line.decode().strip())
+                    event_type = event.get("type")
+                    
+                    # Filter and send relevant events
+                    if event_type == "assistant":
+                        # Extract text content from assistant messages
+                        message = event.get("message", {})
+                        content = message.get("content", [])
+                        for item in content:
+                            if item.get("type") == "text":
+                                yield f"data: {json.dumps({'type': 'assistant', 'text': item.get('text', '')})}\n\n"
+                            elif item.get("type") == "tool_use":
+                                # Send tool use notifications
+                                tool_name = item.get("name", "").replace("mcp__n8n-mcp__", "")
+                                yield f"data: {json.dumps({'type': 'tool', 'name': tool_name})}\n\n"
+                    
+                    elif event_type == "result":
+                        # Send final result
+                        yield f"data: {json.dumps({'type': 'result', 'text': event.get('result', ''), 'session_id': event.get('session_id')})}\n\n"
+                
+                except json.JSONDecodeError:
+                    # Skip non-JSON lines
+                    continue
+            
+            # Wait for process to complete
+            await process.wait()
+            
+            # Clean up credentials
+            if os.path.exists(cred_dir / f"{request_uuid}.json"):
+                os.remove(cred_dir / f"{request_uuid}.json")
+            
+            # Send done event
+            yield f"data: {json.dumps({'type': 'done'})}\n\n"
+            
+        except Exception as e:
+            yield f"data: {json.dumps({'type': 'error', 'message': str(e)})}\n\n"
+    
+    return StreamingResponse(
+        generate_sse(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no"  # Disable Nginx buffering
+        }
+    )
 
 @app.post("/feedback")
 async def submit_feedback(request: FeedbackRequest):

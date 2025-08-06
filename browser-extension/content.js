@@ -123,13 +123,29 @@ async function sendMessage() {
     const sessionIds = result.sessionIds || {};
     const sessionId = sessionIds[currentDomain] || null;
     
-    try {
-      const response = await fetch(CONFIG.SERVICE_URL, {
+    // Check if streaming is supported and use SSE
+    const useStreaming = true; // You can make this configurable
+    
+    if (useStreaming) {
+      // Use SSE for streaming response
+      const streamUrl = CONFIG.SERVICE_URL.replace('/chat', '/chat/stream');
+      
+      // Create form data for POST request with EventSource
+      const params = new URLSearchParams({
+        message: message,
+        auth_token: result.authToken,
+        api_key: result.apiKey,
+        api_url: apiUrl,
+        ...(sessionId && { session_id: sessionId })
+      });
+      
+      // Use fetch with SSE since EventSource doesn't support POST with body
+      const response = await fetch(streamUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ 
+        body: JSON.stringify({
           message: message,
           auth_token: result.authToken,
           api_key: result.apiKey,
@@ -138,36 +154,143 @@ async function sendMessage() {
         })
       });
       
-      // Remove loading message
-      removeLoadingMessage(loadingMessage);
-      
-      if (response.ok) {
-        const data = await response.json();
-        addMessage(data.response, 'assistant');
-        
-        // Store session ID if present
-        if (data.session_id) {
-          chrome.storage.local.get(['sessionIds'], (storageResult) => {
-            const sessionIds = storageResult.sessionIds || {};
-            sessionIds[currentDomain] = data.session_id;
-            chrome.storage.local.set({ sessionIds: sessionIds });
-          });
-        }
-        
-        // Add notification about reload and then reload the page
-        setTimeout(() => {
-          addMessage('Reloading page to show workflow...', 'assistant');
-          setTimeout(() => {
-            window.location.reload();
-          }, 2000);
-        }, 1000);
-      } else {
-        addMessage('Error: Failed to get response from Claude service', 'assistant');
+      if (!response.ok) {
+        removeLoadingMessage(loadingMessage);
+        const error = await response.text();
+        addMessage(`Error: ${error}`, 'assistant');
+        return;
       }
-    } catch (error) {
-      // Remove loading message on error
-      removeLoadingMessage(loadingMessage);
-      addMessage('Error: Could not connect to Claude service. Make sure the service is running.', 'assistant');
+      
+      // Create streaming message element
+      let streamingMessage = null;
+      let fullText = '';
+      let sessionIdReceived = null;
+      
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+      
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop(); // Keep incomplete line in buffer
+        
+        for (const line of lines) {
+          if (line.startsWith('data: ')) {
+            try {
+              const data = JSON.parse(line.slice(6));
+              
+              if (data.type === 'assistant') {
+                // Remove loading message on first content
+                if (loadingMessage) {
+                  removeLoadingMessage(loadingMessage);
+                  loadingMessage = null;
+                }
+                
+                // Append text to streaming message
+                fullText += data.text;
+                if (!streamingMessage) {
+                  streamingMessage = addMessage(data.text, 'assistant');
+                } else {
+                  // Update existing message
+                  streamingMessage.textContent = fullText;
+                }
+              } else if (data.type === 'tool') {
+                // Show tool usage as status
+                if (!streamingMessage) {
+                  removeLoadingMessage(loadingMessage);
+                  loadingMessage = null;
+                  streamingMessage = addMessage(`Using tool: ${data.name}...`, 'assistant');
+                }
+              } else if (data.type === 'result') {
+                // Final result - replace streaming message with formatted result
+                if (streamingMessage) {
+                  streamingMessage.textContent = data.text;
+                } else {
+                  removeLoadingMessage(loadingMessage);
+                  addMessage(data.text, 'assistant');
+                }
+                sessionIdReceived = data.session_id;
+              } else if (data.type === 'error') {
+                removeLoadingMessage(loadingMessage);
+                addMessage(`Error: ${data.message}`, 'assistant');
+                return;
+              }
+            } catch (e) {
+              console.error('Error parsing SSE data:', e);
+            }
+          }
+        }
+      }
+      
+      // Store session ID if received
+      if (sessionIdReceived) {
+        chrome.storage.local.get(['sessionIds'], (storageResult) => {
+          const sessionIds = storageResult.sessionIds || {};
+          sessionIds[currentDomain] = sessionIdReceived;
+          chrome.storage.local.set({ sessionIds: sessionIds });
+        });
+      }
+      
+      // Add notification about reload and then reload the page
+      setTimeout(() => {
+        addMessage('Reloading page to show workflow...', 'assistant');
+        setTimeout(() => {
+          window.location.reload();
+        }, 2000);
+      }, 1000);
+      
+    } else {
+      // Fallback to regular fetch
+      try {
+        const response = await fetch(CONFIG.SERVICE_URL, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ 
+            message: message,
+            auth_token: result.authToken,
+            api_key: result.apiKey,
+            api_url: apiUrl,
+            session_id: sessionId
+          })
+        });
+        
+        // Remove loading message
+        removeLoadingMessage(loadingMessage);
+        
+        if (response.ok) {
+          const data = await response.json();
+          addMessage(data.response, 'assistant');
+          
+          // Store session ID if present
+          if (data.session_id) {
+            chrome.storage.local.get(['sessionIds'], (storageResult) => {
+              const sessionIds = storageResult.sessionIds || {};
+              sessionIds[currentDomain] = data.session_id;
+              chrome.storage.local.set({ sessionIds: sessionIds });
+            });
+          }
+          
+          // Add notification about reload and then reload the page
+          setTimeout(() => {
+            addMessage('Reloading page to show workflow...', 'assistant');
+            setTimeout(() => {
+              window.location.reload();
+            }, 2000);
+          }, 1000);
+        } else {
+          addMessage('Error: Failed to get response from Claude service', 'assistant');
+        }
+      } catch (error) {
+        // Remove loading message on error
+        removeLoadingMessage(loadingMessage);
+        addMessage('Error: Could not connect to Claude service. Make sure the service is running.', 'assistant');
+      }
     }
     
     saveChatHistory();

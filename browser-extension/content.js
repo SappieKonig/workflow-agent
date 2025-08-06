@@ -161,9 +161,7 @@ async function sendMessage() {
         return;
       }
       
-      // Create streaming message element
-      let streamingMessage = null;
-      let fullText = '';
+      // Track session ID from result
       let sessionIdReceived = null;
       
       const reader = response.body.getReader();
@@ -180,39 +178,16 @@ async function sendMessage() {
         
         for (const line of lines) {
           if (line.startsWith('data: ')) {
+            const dataStr = line.slice(6);
+            
+            // Try to parse as JSON first (for result/error messages)
             try {
-              const data = JSON.parse(line.slice(6));
+              const data = JSON.parse(dataStr);
               
-              if (data.type === 'assistant') {
-                // Remove loading message on first content
-                if (loadingMessage) {
-                  removeLoadingMessage(loadingMessage);
-                  loadingMessage = null;
-                }
-                
-                // Append text to streaming message
-                fullText += data.text;
-                if (!streamingMessage) {
-                  streamingMessage = addMessage(data.text, 'assistant');
-                } else {
-                  // Update existing message
-                  streamingMessage.textContent = fullText;
-                }
-              } else if (data.type === 'tool') {
-                // Show tool usage as status
-                if (!streamingMessage) {
-                  removeLoadingMessage(loadingMessage);
-                  loadingMessage = null;
-                  streamingMessage = addMessage(`Using tool: ${data.name}...`, 'assistant');
-                }
-              } else if (data.type === 'result') {
-                // Final result - replace streaming message with formatted result
-                if (streamingMessage) {
-                  streamingMessage.textContent = data.text;
-                } else {
-                  removeLoadingMessage(loadingMessage);
-                  addMessage(data.text, 'assistant');
-                }
+              if (data.type === 'result') {
+                // Final result - remove loading and show final message
+                removeLoadingMessage(loadingMessage);
+                addMessage(data.text, 'assistant');
                 sessionIdReceived = data.session_id;
               } else if (data.type === 'error') {
                 removeLoadingMessage(loadingMessage);
@@ -220,7 +195,14 @@ async function sendMessage() {
                 return;
               }
             } catch (e) {
-              console.error('Error parsing SSE data:', e);
+              // Not JSON, must be a message ID
+              if (dataStr && loadingMessage) {
+                // Update the loading text with the message ID
+                const loadingText = loadingMessage.querySelector('.loading-text');
+                if (loadingText) {
+                  loadingText.textContent = dataStr;
+                }
+              }
             }
           }
         }

@@ -227,16 +227,11 @@ async def chat_stream(request: ChatRequest):
                     
                     # Filter and send relevant events
                     if event_type == "assistant":
-                        # Extract text content from assistant messages
+                        # Extract and send just the message ID
                         message = event.get("message", {})
-                        content = message.get("content", [])
-                        for item in content:
-                            if item.get("type") == "text":
-                                yield f"data: {json.dumps({'type': 'assistant', 'text': item.get('text', '')})}\n\n"
-                            elif item.get("type") == "tool_use":
-                                # Send tool use notifications
-                                tool_name = item.get("name", "").replace("mcp__n8n-mcp__", "")
-                                yield f"data: {json.dumps({'type': 'tool', 'name': tool_name})}\n\n"
+                        message_id = message.get("id", "")
+                        if message_id:
+                            yield f"data: {message_id}\n\n"
                     
                     elif event_type == "result":
                         # Send final result

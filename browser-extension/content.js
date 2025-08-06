@@ -93,8 +93,8 @@ async function sendMessage() {
   
   saveChatHistory();
   
-  // Get configuration from storage
-  chrome.storage.local.get(['authToken', 'apiKey'], async (result) => {
+  // Get configuration and session from storage
+  chrome.storage.local.get(['authToken', 'apiKey', 'sessionIds'], async (result) => {
     if (!result.authToken) {
       removeLoadingMessage(loadingMessage);
       addMessage('Error: Service auth token not configured. Please configure it in the extension popup.', 'assistant');
@@ -119,6 +119,10 @@ async function sendMessage() {
       return;
     }
     
+    // Get session ID for this domain if it exists
+    const sessionIds = result.sessionIds || {};
+    const sessionId = sessionIds[currentDomain] || null;
+    
     try {
       const response = await fetch(CONFIG.SERVICE_URL, {
         method: 'POST',
@@ -129,7 +133,8 @@ async function sendMessage() {
           message: message,
           auth_token: result.authToken,
           api_key: result.apiKey,
-          api_url: apiUrl
+          api_url: apiUrl,
+          session_id: sessionId
         })
       });
       
@@ -139,6 +144,15 @@ async function sendMessage() {
       if (response.ok) {
         const data = await response.json();
         addMessage(data.response, 'assistant');
+        
+        // Store session ID if present
+        if (data.session_id) {
+          chrome.storage.local.get(['sessionIds'], (storageResult) => {
+            const sessionIds = storageResult.sessionIds || {};
+            sessionIds[currentDomain] = data.session_id;
+            chrome.storage.local.set({ sessionIds: sessionIds });
+          });
+        }
         
         // Add notification about reload and then reload the page
         setTimeout(() => {
@@ -256,7 +270,15 @@ function clearChatHistory() {
       <div class="message-content">Hello! How can I help you today?</div>
     </div>
   `;
+  
+  // Clear chat history and session ID for this domain
   chrome.storage.local.set({ chatHistory: [] });
+  
+  chrome.storage.local.get(['sessionIds'], (result) => {
+    const sessionIds = result.sessionIds || {};
+    delete sessionIds[currentDomain];
+    chrome.storage.local.set({ sessionIds: sessionIds });
+  });
 }
 
 chrome.storage.local.get(['domainStates'], (result) => {

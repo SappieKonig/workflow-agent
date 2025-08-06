@@ -1,6 +1,7 @@
 import asyncio
 import os
 import csv
+import json
 from datetime import datetime
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -37,6 +38,7 @@ class ChatRequest(BaseModel):
     auth_token: str
     api_key: str
     api_url: str
+    session_id: str = None
 
 class FeedbackRequest(BaseModel):
     feedback: str
@@ -113,9 +115,14 @@ async def chat(request: ChatRequest):
 
         print(f"Running claude command with UUID: {request_uuid}")
         
+        # Build claude command with JSON output and optional session resume
+        claude_cmd = ["claude", "-p", prompt, "--output-format", "json"]
+        if request.session_id:
+            claude_cmd.extend(["--resume", request.session_id])
+        
         # Use async subprocess to avoid blocking the server
         process = await asyncio.create_subprocess_exec(
-            "claude", "-p", prompt,
+            *claude_cmd,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE
         )
@@ -133,9 +140,25 @@ async def chat(request: ChatRequest):
         if process.returncode == 0:
             claude_response = stdout.decode().strip()
             print(f"Claude response: {claude_response}")
-            return {"response": claude_response}
+            
+            try:
+                # Parse JSON response from claude
+                response_json = json.loads(claude_response)
+                result_text = response_json.get("result", "")
+                session_id = response_json.get("session_id", None)
+                
+                return {
+                    "response": result_text,
+                    "session_id": session_id
+                }
+            except json.JSONDecodeError:
+                # Fallback if JSON parsing fails
+                return {
+                    "response": claude_response,
+                    "session_id": None
+                }
         else:
-            return {"response": f"Error: {stderr.decode().strip()}"}
+            return {"response": f"Error: {stderr.decode().strip()}", "session_id": None}
             
     except FileNotFoundError:
         raise HTTPException(status_code=500, detail="Claude CLI not found")

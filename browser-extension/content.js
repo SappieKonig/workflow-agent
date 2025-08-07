@@ -123,24 +123,8 @@ async function sendMessage() {
     const sessionIds = result.sessionIds || {};
     const sessionId = sessionIds[currentDomain] || null;
     
-    // Check if streaming is supported and use SSE
-    const useStreaming = true; // You can make this configurable
-    
-    if (useStreaming) {
-      // Use SSE for streaming response
-      const streamUrl = CONFIG.SERVICE_URL.replace('/chat', '/chat/stream');
-      
-      // Create form data for POST request with EventSource
-      const params = new URLSearchParams({
-        message: message,
-        auth_token: result.authToken,
-        api_key: result.apiKey,
-        api_url: apiUrl,
-        ...(sessionId && { session_id: sessionId })
-      });
-      
-      // Use fetch with SSE since EventSource doesn't support POST with body
-      const response = await fetch(streamUrl, {
+    // Use SSE for streaming response
+    const response = await fetch(CONFIG.SERVICE_URL, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -228,57 +212,6 @@ async function sendMessage() {
           window.location.reload();
         }, 2000);
       }, 1000);
-      
-    } else {
-      // Fallback to regular fetch
-      try {
-        const response = await fetch(CONFIG.SERVICE_URL, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ 
-            message: message,
-            auth_token: result.authToken,
-            api_key: result.apiKey,
-            api_url: apiUrl,
-            session_id: sessionId,
-            n8n_credentials: result.n8nCredentials
-          })
-        });
-        
-        // Remove loading message
-        removeLoadingMessage(loadingMessage);
-        
-        if (response.ok) {
-          const data = await response.json();
-          addMessage(data.response, 'assistant');
-          
-          // Store session ID if present
-          if (data.session_id) {
-            chrome.storage.local.get(['sessionIds'], (storageResult) => {
-              const sessionIds = storageResult.sessionIds || {};
-              sessionIds[currentDomain] = data.session_id;
-              chrome.storage.local.set({ sessionIds: sessionIds });
-            });
-          }
-          
-          // Add notification about reload and then reload the page
-          setTimeout(() => {
-            addMessage('Reloading page to show workflow...', 'assistant');
-            setTimeout(() => {
-              window.location.reload();
-            }, 2000);
-          }, 1000);
-        } else {
-          addMessage('Error: Failed to get response from Claude service', 'assistant');
-        }
-      } catch (error) {
-        // Remove loading message on error
-        removeLoadingMessage(loadingMessage);
-        addMessage('Error: Could not connect to Claude service. Make sure the service is running.', 'assistant');
-      }
-    }
     
     saveChatHistory();
   });

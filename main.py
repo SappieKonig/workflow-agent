@@ -4,7 +4,7 @@ import csv
 import json
 from datetime import datetime
 from typing import Optional, Dict, List
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
@@ -152,98 +152,6 @@ def compress_response(claude_response: str) -> str:
 
 @app.post("/chat")
 async def chat(request: ChatRequest):
-    try:
-        # Validate auth token input first
-        if not request.auth_token or not request.auth_token.strip():
-            raise HTTPException(status_code=401, detail="Authentication token is required")
-        
-        # Validate auth token against database
-        if not validate_auth_token(request.auth_token):
-            raise HTTPException(status_code=401, detail="Invalid or expired authentication token")
-        
-        # Add URL context if provided
-        prompt = request.message
-        if request.api_url:
-            if "/workflow/" in request.api_url:
-                # Extract workflow ID from URL
-                workflow_id = request.api_url.split("/workflow/")[-1]
-                prompt = f"Context: User is currently viewing/editing workflow with ID: {workflow_id} on n8n at {request.api_url}\n\nPlease modify or update this existing workflow based on the user's request.\n\nUser request: {request.message}"
-            else:
-                prompt = f"Context: User is currently on this page: {request.api_url}\n\nPlease create a new workflow based on the user's request.\n\nUser request: {request.message}"
-
-        request_uuid = uuid.uuid4()
-        N8NCredential(api_key=request.api_key, api_url=request.api_url).write(cred_dir / f"{request_uuid}.json")
-        
-        # Store n8n credentials if provided
-        if request.n8n_credentials:
-            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")[:-3]  # microseconds truncated to milliseconds
-            creds_file = creds2_dir / f"{timestamp}.json"
-            with open(creds_file, 'w') as f:
-                json.dump(request.n8n_credentials, f, indent=2)
-            print(f"Stored credentials to: {creds_file}")
-
-        system_prompt = "Exclusively use the n8n-mcp tools."
-
-        prompt = f"{system_prompt}\n\nThe UUID of this request with which you can call tools on the user's n8n is {request_uuid}\n\n{prompt}"
-
-        print(f"Running claude command with UUID: {request_uuid}")
-        
-        # Build claude command with JSON output and optional session resume
-        claude_cmd = ["claude", "-p", prompt, "--output-format", "json"]
-        if request.session_id:
-            claude_cmd.extend(["--resume", request.session_id])
-        
-        # Use async subprocess to avoid blocking the server
-        process = await asyncio.create_subprocess_exec(
-            *claude_cmd,
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE
-        )
-        
-        try:
-            stdout, stderr = await asyncio.wait_for(
-                process.communicate(), 
-                timeout=300
-            )
-        except asyncio.TimeoutError:
-            process.kill()
-            await process.wait()
-            raise HTTPException(status_code=408, detail="Request timeout")
-        
-        if process.returncode == 0:
-            claude_response = stdout.decode().strip()
-            print(f"Claude response: {claude_response}")
-            
-            try:
-                # Parse JSON response from claude
-                response_json = json.loads(claude_response)
-                result_text = response_json.get("result", "")
-                session_id = response_json.get("session_id", None)
-                
-                return {
-                    "response": result_text,
-                    "session_id": session_id
-                }
-            except json.JSONDecodeError:
-                # Fallback if JSON parsing fails
-                return {
-                    "response": claude_response,
-                    "session_id": None
-                }
-        else:
-            return {"response": f"Error: {stderr.decode().strip()}", "session_id": None}
-            
-    except FileNotFoundError:
-        raise HTTPException(status_code=500, detail="Claude CLI not found")
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-    finally:
-        if os.path.exists(cred_dir / f"{request_uuid}.json"):
-            os.remove(cred_dir / f"{request_uuid}.json")
-
-@app.post("/chat/stream")
-async def chat_stream(request: ChatRequest):
     """Stream Claude's response using Server-Sent Events."""
     async def generate_sse():
         try:

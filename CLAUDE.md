@@ -1,5 +1,13 @@
 # Claude Context for Workflow Agent
 
+## Branding Guidelines
+
+Brand colors for the extension:
+- Primary Red: #FF4040 
+- Dark Red: #B32D2D
+- Dark Gray: #292929
+- Light Gray: #FAFAFA
+
 ## Project Structure
 
 ```

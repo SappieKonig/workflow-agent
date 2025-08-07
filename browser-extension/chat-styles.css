@@ -48,9 +48,9 @@ body.n8n-chat-open #right-side-chatbox {
   width: 30vw;
   min-width: 300px;
   height: 100vh;
-  background: #ffffff;
-  border-left: 2px solid #e0e0e0;
-  box-shadow: -2px 0 10px rgba(0, 0, 0, 0.1);
+  background: #FAFAFA;
+  border-left: 2px solid #292929;
+  box-shadow: -2px 0 10px rgba(0, 0, 0, 0.2);
   z-index: 10000;
   display: none;
   flex-direction: column;
@@ -61,9 +61,9 @@ body.n8n-chat-open #right-side-chatbox {
 }
 
 .chat-header {
-  background: #f8f9fa;
+  background: #292929;
   padding: 16px 20px;
-  border-bottom: 1px solid #e0e0e0;
+  border-bottom: 1px solid #B32D2D;
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -72,7 +72,7 @@ body.n8n-chat-open #right-side-chatbox {
 
 .chat-title {
   font-weight: 600;
-  color: #333;
+  color: #FAFAFA;
   font-size: 16px;
 }
 
@@ -80,7 +80,7 @@ body.n8n-chat-open #right-side-chatbox {
   background: none;
   border: none;
   font-size: 12px;
-  color: #666;
+  color: #FAFAFA;
   cursor: pointer;
   padding: 6px 12px;
   border-radius: 4px;
@@ -99,8 +99,8 @@ body.n8n-chat-open #right-side-chatbox {
 }
 
 .chat-close:hover, .chat-clear:hover {
-  background: #e9ecef;
-  color: #333;
+  background: #B32D2D;
+  color: #FAFAFA;
 }
 
 .chat-messages {
@@ -144,21 +144,22 @@ body.n8n-chat-open #right-side-chatbox {
 }
 
 .user-message .message-content {
-  background: #007bff;
+  background: #FF4040;
   color: white;
   border-bottom-right-radius: 4px;
 }
 
 .assistant-message .message-content {
-  background: #f1f3f4;
-  color: #333;
+  background: #FAFAFA;
+  color: #292929;
+  border: 1px solid #B32D2D;
   border-bottom-left-radius: 4px;
 }
 
 .chat-input-container {
   padding: 16px 20px;
-  border-top: 1px solid #e0e0e0;
-  background: #ffffff;
+  border-top: 1px solid #B32D2D;
+  background: #FAFAFA;
   display: flex;
   gap: 12px;
   align-items: center;
@@ -168,13 +169,13 @@ body.n8n-chat-open #right-side-chatbox {
 #chat-input {
   flex: 1;
   padding: 12px 16px;
-  border: 1px solid #ddd;
+  border: 1px solid #B32D2D;
   border-radius: 20px;
   outline: none;
   font-size: 14px;
   font-family: inherit;
-  background: #f8f9fa;
-  color: #333;
+  background: #ffffff;
+  color: #292929;
   transition: border-color 0.2s, background-color 0.2s;
   resize: none;
   min-height: 20px;
@@ -184,9 +185,9 @@ body.n8n-chat-open #right-side-chatbox {
 }
 
 #chat-input:focus {
-  border-color: #007bff;
+  border-color: #FF4040;
   background: #ffffff;
-  color: #222;
+  color: #292929;
 }
 
 #chat-input::placeholder {
@@ -195,7 +196,7 @@ body.n8n-chat-open #right-side-chatbox {
 
 
 #chat-send-btn {
-  background: #007bff;
+  background: #FF4040;
   color: white;
   border: none;
   border-radius: 50%;
@@ -211,7 +212,7 @@ body.n8n-chat-open #right-side-chatbox {
 }
 
 #chat-send-btn:hover {
-  background: #0056b3;
+  background: #B32D2D;
 }
 
 #chat-send-btn:active {
@@ -227,12 +228,12 @@ body.n8n-chat-open #right-side-chatbox {
 }
 
 .chat-messages::-webkit-scrollbar-thumb {
-  background: #ccc;
+  background: #B32D2D;
   border-radius: 3px;
 }
 
 .chat-messages::-webkit-scrollbar-thumb:hover {
-  background: #999;
+  background: #FF4040;
 }
 
 @media (max-width: 1200px) {
@@ -258,8 +259,8 @@ body.n8n-chat-open #right-side-chatbox {
 .loading-spinner {
   width: 16px;
   height: 16px;
-  border: 2px solid #ddd;
-  border-top: 2px solid #007bff;
+  border: 2px solid #B32D2D;
+  border-top: 2px solid #FF4040;
   border-radius: 50%;
   animation: spin 1s linear infinite;
   flex-shrink: 0;
@@ -267,7 +268,7 @@ body.n8n-chat-open #right-side-chatbox {
 
 .loading-text {
   font-style: italic;
-  color: #666;
+  color: #292929;
 }
 
 @keyframes spin {

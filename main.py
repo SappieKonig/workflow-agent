@@ -186,8 +186,19 @@ async def chat(request: ChatRequest):
                     json.dump(request.n8n_credentials, f, indent=2)
                 print(f"Stored credentials to: {creds_file}")
             
+            # Add credentials context if available
+            credentials_context = ""
+            if request.n8n_credentials:
+                credentials_data = request.n8n_credentials.get('rawResponse', {}).get('data', [])
+                if credentials_data:
+                    cred_list = []
+                    for cred in credentials_data:
+                        cred_info = f"- {cred.get('name', 'Unknown')} (ID: {cred.get('id', 'unknown')}, Type: {cred.get('type', 'unknown')})"
+                        cred_list.append(cred_info)
+                    credentials_context = f"\n\nAvailable n8n credentials you can reference by ID:\n" + "\n".join(cred_list)
+            
             system_prompt = """You are an n8n workflow creation and management expert. You have access to tools to create, update, and manage n8n workflows via API."""
-            prompt = f"{system_prompt}\n\nThe UUID of this request with which you can call tools on the user's n8n is {request_uuid}\n\n{prompt}"
+            prompt = f"{system_prompt}\n\nThe UUID of this request with which you can call tools on the user's n8n is {request_uuid}{credentials_context}\n\n{prompt}"
             
             # Build Claude command with streaming JSON output
             claude_cmd = ["claude", "-p", prompt, "--output-format", "stream-json", "--verbose"]

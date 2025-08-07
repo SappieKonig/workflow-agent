@@ -308,4 +308,11 @@ document.addEventListener('DOMContentLoaded', () => {
       submitFeedback.textContent = 'Submit Feedback';
     }
   });
+
+  // FAQ functionality
+  const faqButton = document.getElementById('faqButton');
+  
+  faqButton.addEventListener('click', () => {
+    chrome.tabs.create({ url: 'https://trylinker.io#faq' });
+  });
 });

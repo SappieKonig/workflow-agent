@@ -59,6 +59,66 @@ function setupEventListeners() {
   clearButton.addEventListener('click', clearChatHistory);
 }
 
+function parseMarkdown(text) {
+  // Simple markdown parser for common elements
+  let html = text;
+  
+  // Code blocks (triple backticks)
+  html = html.replace(/```(\w+)?\n([\s\S]*?)```/g, (match, lang, code) => {
+    const language = lang ? ` class="language-${lang}"` : '';
+    return `<pre><code${language}>${escapeHtml(code.trim())}</code></pre>`;
+  });
+  
+  // Inline code (single backticks)
+  html = html.replace(/`([^`]+)`/g, '<code>$1</code>');
+  
+  // Bold text
+  html = html.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+  html = html.replace(/__([^_]+)__/g, '<strong>$1</strong>');
+  
+  // Italic text
+  html = html.replace(/\*([^*]+)\*/g, '<em>$1</em>');
+  html = html.replace(/_([^_]+)_/g, '<em>$1</em>');
+  
+  // Headers
+  html = html.replace(/^### (.*$)/gm, '<h3>$1</h3>');
+  html = html.replace(/^## (.*$)/gm, '<h2>$1</h2>');
+  html = html.replace(/^# (.*$)/gm, '<h1>$1</h1>');
+  
+  // Links
+  html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>');
+  
+  // Lists (simple bullet points)
+  html = html.replace(/^- (.+)$/gm, '<li>$1</li>');
+  html = html.replace(/(<li>.*<\/li>)/s, '<ul>$1</ul>');
+  
+  // Numbered lists
+  html = html.replace(/^\d+\. (.+)$/gm, '<li>$1</li>');
+  html = html.replace(/(<li>.*<\/li>)/s, (match) => {
+    if (!match.includes('<ul>')) {
+      return `<ol>${match}</ol>`;
+    }
+    return match;
+  });
+  
+  // Line breaks
+  html = html.replace(/\n\n/g, '</p><p>');
+  html = html.replace(/\n/g, '<br>');
+  
+  // Wrap in paragraphs if not already wrapped
+  if (!html.includes('<p>') && !html.includes('<pre>') && !html.includes('<h')) {
+    html = `<p>${html}</p>`;
+  }
+  
+  return html;
+}
+
+function escapeHtml(text) {
+  const div = document.createElement('div');
+  div.textContent = text;
+  return div.innerHTML;
+}
+
 function autoResizeTextarea() {
   const chatInput = document.getElementById('chat-input');
   if (!chatInput) return;
@@ -222,7 +282,9 @@ function addMessage(text, sender) {
   const messageDiv = document.createElement('div');
   messageDiv.className = `message ${sender}-message`;
   
-  messageDiv.innerHTML = `<div class="message-content">${text}</div>`;
+  // Parse markdown for assistant messages, escape HTML for user messages
+  const content = sender === 'assistant' ? parseMarkdown(text) : escapeHtml(text);
+  messageDiv.innerHTML = `<div class="message-content">${content}</div>`;
   
   messagesContainer.appendChild(messageDiv);
   messagesContainer.scrollTop = messagesContainer.scrollHeight;

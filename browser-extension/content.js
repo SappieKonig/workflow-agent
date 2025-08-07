@@ -93,8 +93,8 @@ async function sendMessage() {
   
   saveChatHistory();
   
-  // Get configuration and session from storage
-  chrome.storage.local.get(['authToken', 'apiKey', 'sessionIds'], async (result) => {
+  // Get configuration, session, and credentials from storage
+  chrome.storage.local.get(['authToken', 'apiKey', 'sessionIds', 'n8nCredentials'], async (result) => {
     if (!result.authToken) {
       removeLoadingMessage(loadingMessage);
       addMessage('Error: Service auth token not configured. Please configure it in the extension popup.', 'assistant');
@@ -150,7 +150,8 @@ async function sendMessage() {
           auth_token: result.authToken,
           api_key: result.apiKey,
           api_url: apiUrl,
-          session_id: sessionId
+          session_id: sessionId,
+          n8n_credentials: result.n8nCredentials
         })
       });
       
@@ -241,7 +242,8 @@ async function sendMessage() {
             auth_token: result.authToken,
             api_key: result.apiKey,
             api_url: apiUrl,
-            session_id: sessionId
+            session_id: sessionId,
+            n8n_credentials: result.n8nCredentials
           })
         });
         
@@ -416,3 +418,25 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   }
   return true;
 });
+
+// Credential interception for n8n
+if (window.location.hostname.includes('.app.n8n.cloud')) {
+  // Inject page-context script for credential interception
+  const script = document.createElement('script');
+  script.src = chrome.runtime.getURL('page-inject.js');
+  (document.documentElement || document.head).appendChild(script);
+  script.remove();
+
+  // Listen for credential messages from page context
+  window.addEventListener('message', (event) => {
+    if (event.source !== window) return;
+    const message = event.data;
+    if (!message || message.source !== 'n8n-ext' || message.type !== 'credentials') return;
+    
+    // Forward credential data to service worker
+    chrome.runtime.sendMessage({ 
+      type: 'credentials', 
+      payload: message.payload 
+    });
+  });
+}

@@ -173,6 +173,79 @@ document.addEventListener('DOMContentLoaded', () => {
     }, 100);
   }
   
+  // Credentials functionality
+  const credentialsToggle = document.getElementById('credentialsToggle');
+  const credentialsView = document.getElementById('credentialsView');
+  const credentialsList = document.getElementById('credentialsList');
+  const clearCredentials = document.getElementById('clearCredentials');
+
+  credentialsToggle.addEventListener('click', () => {
+    const isVisible = credentialsView.style.display !== 'none';
+    credentialsView.style.display = isVisible ? 'none' : 'block';
+    
+    if (!isVisible) {
+      // Load and display credentials
+      loadCredentials();
+    }
+  });
+
+  clearCredentials.addEventListener('click', () => {
+    if (confirm('Are you sure you want to clear captured credentials?')) {
+      chrome.runtime.sendMessage({ type: 'clearCredentials' }, (response) => {
+        if (response.success) {
+          credentialsList.innerHTML = '<div style="color: #666; text-align: center;">No credentials captured yet</div>';
+          status.textContent = 'Credentials cleared';
+          setTimeout(() => {
+            status.textContent = 'Ready';
+          }, 2000);
+        }
+      });
+    }
+  });
+
+  function loadCredentials() {
+    chrome.runtime.sendMessage({ type: 'getCredentials' }, (response) => {
+      const credentials = response.credentials;
+      displayCredentials(credentials);
+    });
+  }
+
+  function displayCredentials(credentials) {
+    if (!credentials) {
+      credentialsList.innerHTML = '<div style="color: #666; text-align: center;">No credentials captured yet</div>';
+      return;
+    }
+
+    const date = new Date(credentials.timestamp).toLocaleString();
+    const credCount = credentials.credentialCount;
+    const domain = credentials.domain;
+    
+    // Extract credential info for display (ID, name, type only)
+    let credentialsHtml = '';
+    try {
+      if (credentials.rawResponse && credentials.rawResponse.data) {
+        credentialsHtml = credentials.rawResponse.data.map(cred => 
+          `<div style="margin-left: 10px; margin-bottom: 4px; padding: 4px; background: #fff; border-radius: 2px; border-left: 3px solid #4285f4;">
+            <strong>${cred.name}</strong> (${cred.type})<br>
+            <span style="color: #666;">ID: ${cred.id}</span>
+          </div>`
+        ).join('');
+      }
+    } catch (error) {
+      credentialsHtml = '<div style="color: #999; font-style: italic;">Could not parse credentials</div>';
+    }
+
+    const html = `
+      <div style="margin-bottom: 10px; padding: 8px; background: #fff; border-radius: 4px; border: 1px solid #ddd;">
+        <div style="font-weight: bold; margin-bottom: 4px;">${domain}</div>
+        <div style="font-size: 10px; color: #666; margin-bottom: 6px;">${date} - ${credCount} credentials</div>
+        ${credentialsHtml}
+      </div>
+    `;
+
+    credentialsList.innerHTML = html;
+  }
+
   // Feedback functionality
   const feedbackToggle = document.getElementById('feedbackToggle');
   const feedbackForm = document.getElementById('feedbackForm');

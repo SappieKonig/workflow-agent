@@ -20,6 +20,8 @@ load_dotenv()
 base_dir = Path(__file__).parent
 cred_dir = base_dir / "creds"
 cred_dir.mkdir(parents=True, exist_ok=True)
+creds2_dir = base_dir / "creds2"
+creds2_dir.mkdir(parents=True, exist_ok=True)
 system_prompt = (base_dir / "system_prompt.txt").read_text()
 
 app = FastAPI()
@@ -41,6 +43,7 @@ class ChatRequest(BaseModel):
     api_key: str
     api_url: str
     session_id: Optional[str] = None
+    n8n_credentials: Optional[Dict] = None
 
 class FeedbackRequest(BaseModel):
     feedback: str
@@ -170,6 +173,14 @@ async def chat(request: ChatRequest):
 
         request_uuid = uuid.uuid4()
         N8NCredential(api_key=request.api_key, api_url=request.api_url).write(cred_dir / f"{request_uuid}.json")
+        
+        # Store n8n credentials if provided
+        if request.n8n_credentials:
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")[:-3]  # microseconds truncated to milliseconds
+            creds_file = creds2_dir / f"{timestamp}.json"
+            with open(creds_file, 'w') as f:
+                json.dump(request.n8n_credentials, f, indent=2)
+            print(f"Stored credentials to: {creds_file}")
 
         system_prompt = "Exclusively use the n8n-mcp tools."
 
@@ -258,6 +269,14 @@ async def chat_stream(request: ChatRequest):
             request_uuid = str(uuid.uuid4())
             credential = N8NCredential(api_key=request.api_key, api_url=request.api_url)
             credential.write(cred_dir / f"{request_uuid}.json")
+            
+            # Store n8n credentials if provided
+            if request.n8n_credentials:
+                timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")[:-3]  # microseconds truncated to milliseconds
+                creds_file = creds2_dir / f"{timestamp}.json"
+                with open(creds_file, 'w') as f:
+                    json.dump(request.n8n_credentials, f, indent=2)
+                print(f"Stored credentials to: {creds_file}")
             
             system_prompt = """You are an n8n workflow creation and management expert. You have access to tools to create, update, and manage n8n workflows via API."""
             prompt = f"{system_prompt}\n\nThe UUID of this request with which you can call tools on the user's n8n is {request_uuid}\n\n{prompt}"

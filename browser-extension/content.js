@@ -256,12 +256,36 @@ function showChatBox() {
   if (!chatBoxContainer) {
     createChatBox();
   }
+  
+  // Create wrapper if it doesn't exist
+  let pageWrapper = document.getElementById('n8n-page-wrapper');
+  if (!pageWrapper) {
+    // Create wrapper div
+    pageWrapper = document.createElement('div');
+    pageWrapper.id = 'n8n-page-wrapper';
+    
+    // Move all body children except our chat into wrapper
+    const bodyChildren = Array.from(document.body.children);
+    bodyChildren.forEach(child => {
+      if (child.id !== 'right-side-chatbox') {
+        pageWrapper.appendChild(child);
+      }
+    });
+    
+    // Insert wrapper as first child of body
+    document.body.insertBefore(pageWrapper, document.body.firstChild);
+  }
+  
+  // Add class to body and show chat
+  document.body.classList.add('n8n-chat-open');
   chatBoxContainer.style.display = 'flex';
+  
   isVisible = true;
   updateDomainState(true);
 }
 
 function hideChatBox() {
+  document.body.classList.remove('n8n-chat-open');
   if (chatBoxContainer) {
     chatBoxContainer.style.display = 'none';
   }

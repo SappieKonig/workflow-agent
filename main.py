@@ -20,8 +20,6 @@ load_dotenv()
 base_dir = Path(__file__).parent
 cred_dir = base_dir / "creds"
 cred_dir.mkdir(parents=True, exist_ok=True)
-creds2_dir = base_dir / "creds2"
-creds2_dir.mkdir(parents=True, exist_ok=True)
 system_prompt = (base_dir / "system_prompt.txt").read_text()
 
 app = FastAPI()
@@ -177,14 +175,6 @@ async def chat(request: ChatRequest):
             request_uuid = str(uuid.uuid4())
             credential = N8NCredential(api_key=request.api_key, api_url=request.api_url)
             credential.write(cred_dir / f"{request_uuid}.json")
-            
-            # Store n8n credentials if provided
-            if request.n8n_credentials:
-                timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")[:-3]  # microseconds truncated to milliseconds
-                creds_file = creds2_dir / f"{timestamp}.json"
-                with open(creds_file, 'w') as f:
-                    json.dump(request.n8n_credentials, f, indent=2)
-                print(f"Stored credentials to: {creds_file}")
             
             # Add credentials context if available
             credentials_context = ""

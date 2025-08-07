@@ -18,9 +18,9 @@ body.n8n-chat-open {
   padding: 0 !important;
 }
 
-/* Allow natural sizing within the reduced space */
-body.n8n-chat-open #n8n-page-wrapper > * {
-  box-sizing: border-box !important;
+/* Handle n8n node buttons wrapper specifically - compensate for partial push */
+body.n8n-chat-open [class*="nodeButtonsWrapper"] {
+  right: 32px !important;
 }
 
 body.n8n-chat-open #right-side-chatbox {

@@ -82,7 +82,19 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     });
 
-    // Save configuration
+    // Auto-save auth token as user types
+    authTokenInput.addEventListener('input', () => {
+      const authToken = authTokenInput.value.trim();
+      chrome.storage.local.set({ authToken });
+    });
+
+    // Auto-save API key as user types
+    apiKeyInput.addEventListener('input', () => {
+      const apiKey = apiKeyInput.value.trim();
+      chrome.storage.local.set({ apiKey });
+    });
+
+    // Save configuration (now just for validation feedback)
     saveConfigButton.addEventListener('click', () => {
       const authToken = authTokenInput.value.trim();
       const apiKey = apiKeyInput.value.trim();
@@ -97,12 +109,10 @@ document.addEventListener('DOMContentLoaded', () => {
         return;
       }
       
-      chrome.storage.local.set({ authToken, apiKey }, () => {
-        status.textContent = 'Configuration saved';
-        setTimeout(() => {
-          status.textContent = 'Ready';
-        }, 2000);
-      });
+      status.textContent = 'Configuration saved';
+      setTimeout(() => {
+        status.textContent = 'Ready';
+      }, 2000);
     });
   }
 

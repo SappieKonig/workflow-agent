@@ -41,7 +41,7 @@ function createChatBox() {
       </div>
     </div>
     <div class="chat-input-container">
-      <textarea id="chat-input" placeholder="Type your message..." rows="1"></textarea>
+      <textarea id="chat-input" placeholder="Type your message..." rows="5"></textarea>
       <button id="chat-send-btn">Send</button>
     </div>
   `;
@@ -67,7 +67,7 @@ function setupEventListeners() {
   });
 
   // Auto-resize textarea
-  chatInput.addEventListener('input', autoResizeTextarea);
+  // chatInput.addEventListener('input', autoResizeTextarea); // Disabled for fixed height
   
   closeButton.addEventListener('click', hideChatBox);
   clearButton.addEventListener('click', clearChatHistory);

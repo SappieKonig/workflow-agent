@@ -12,6 +12,7 @@ from openai import OpenAI
 import uuid
 from pathlib import Path
 from n8n_credential import N8NCredential
+from config import config
 
 from dotenv import load_dotenv
 
@@ -20,8 +21,11 @@ load_dotenv()
 base_dir = Path(__file__).parent
 cred_dir = base_dir / "creds"
 cred_dir.mkdir(parents=True, exist_ok=True)
-streams_dir = base_dir / "streams"
-streams_dir.mkdir(parents=True, exist_ok=True)
+
+# Only create streams directory in development
+if config.enable_stream_logging:
+    streams_dir = base_dir / "streams"
+    streams_dir.mkdir(parents=True, exist_ok=True)
 system_prompt = (base_dir / "system_prompt.txt").read_text()
 
 app = FastAPI()
@@ -228,11 +232,12 @@ async def chat(request: ChatRequest):
             
             # Initialize todo tracker and stream collection
             todo_tracker = TodoTracker()
-            stream_events = []
+            stream_events = [] if config.enable_stream_logging else None
             
-            # Create timestamp for logging
-            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")[:-3]  # Include milliseconds
-            stream_file = streams_dir / f"{timestamp}.json"
+            # Create timestamp for logging (only in development)
+            if config.enable_stream_logging:
+                timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")[:-3]  # Include milliseconds
+                stream_file = streams_dir / f"{timestamp}.json"
             
             # Stream stdout line by line
             while True:
@@ -245,8 +250,9 @@ async def chat(request: ChatRequest):
                     event = json.loads(line.decode().strip())
                     event_type = event.get("type")
                     
-                    # Add to stream collection
-                    stream_events.append(event)
+                    # Add to stream collection (only in development)
+                    if config.enable_stream_logging:
+                        stream_events.append(event)
                     
                     # Check for TodoWrite events
                     if event_type == "assistant":
@@ -267,20 +273,23 @@ async def chat(request: ChatRequest):
                         yield f"data: {json.dumps({'type': 'result', 'data': json.dumps(result_data)})}\n\n"
                 
                 except json.JSONDecodeError:
-                    # Add raw line to stream for non-JSON content
-                    stream_events.append({"raw_line": line.decode().strip()})
+                    # Add raw line to stream for non-JSON content (only in development)
+                    if config.enable_stream_logging:
+                        stream_events.append({"raw_line": line.decode().strip()})
                     continue
             
             # Wait for process to complete
             await process.wait()
             
-            # Save stream to file with proper formatting
-            try:
-                formatted_stream = format_json_recursively(stream_events)
-                with open(stream_file, 'w', encoding='utf-8') as f:
-                    json.dump(formatted_stream, f, indent=2, ensure_ascii=False)
-            except Exception as e:
-                print(f"Error saving stream log: {e}")
+            # Save stream to file with proper formatting (only in development)
+            if config.enable_stream_logging and stream_events:
+                try:
+                    formatted_stream = format_json_recursively(stream_events)
+                    with open(stream_file, 'w', encoding='utf-8') as f:
+                        json.dump(formatted_stream, f, indent=2, ensure_ascii=False)
+                except Exception as e:
+                    if config.is_development:
+                        print(f"Error saving stream log: {e}")
             
             # Clean up credentials
             if os.path.exists(cred_dir / f"{request_uuid}.json"):

@@ -113,14 +113,117 @@
     .save-button:hover {
       background: #B32D2D;
     }
+    
+    .privacy-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0, 0, 0, 0.8);
+      z-index: 10000;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    
+    .privacy-modal {
+      background: #FAFAFA;
+      padding: 20px;
+      border-radius: 8px;
+      width: 280px;
+      border: 2px solid #FF4040;
+    }
+    
+    .privacy-title {
+      font-size: 16px;
+      font-weight: 600;
+      color: #292929;
+      margin-bottom: 12px;
+      text-align: center;
+    }
+    
+    .privacy-content {
+      font-size: 13px;
+      color: #292929;
+      line-height: 1.4;
+      margin-bottom: 16px;
+      text-align: center;
+    }
+    
+    .privacy-link {
+      color: #FF4040;
+      text-decoration: none;
+      font-weight: 500;
+    }
+    
+    .privacy-link:hover {
+      color: #B32D2D;
+      text-decoration: underline;
+    }
+    
+    .privacy-buttons {
+      display: flex;
+      gap: 8px;
+    }
+    
+    .privacy-button {
+      flex: 1;
+      padding: 10px;
+      border: none;
+      border-radius: 4px;
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+    }
+    
+    .privacy-accept {
+      background: #FF4040;
+      color: white;
+    }
+    
+    .privacy-accept:hover {
+      background: #B32D2D;
+    }
+    
+    .privacy-decline {
+      background: #292929;
+      color: white;
+    }
+    
+    .privacy-decline:hover {
+      background: #1a1a1a;
+    }
+    
+    .main-content.disabled {
+      opacity: 0.3;
+      pointer-events: none;
+    }
   </style>
 </head>
 <body>
-  <div class="header">
-    <div class="title">Chat Box</div>
-    <div class="subtitle">Configure and toggle for this domain</div>
-    <div id="currentDomain" class="domain-info"></div>
+  <!-- Privacy Agreement Modal -->
+  <div id="privacyOverlay" class="privacy-overlay" style="display: none;">
+    <div class="privacy-modal">
+      <div class="privacy-title">Privacy Agreement</div>
+      <div class="privacy-content">
+        This extension captures and stores your n8n credentials to enable workflow automation.
+        <br><br>
+        Please read our <a href="https://automaton.fit/privacy_policy.html" target="_blank" class="privacy-link">Privacy Policy</a> before continuing.
+      </div>
+      <div class="privacy-buttons">
+        <button id="privacyDecline" class="privacy-button privacy-decline">Decline</button>
+        <button id="privacyAccept" class="privacy-button privacy-accept">I Agree</button>
+      </div>
+    </div>
   </div>
+
+  <div id="mainContent" class="main-content">
+    <div class="header">
+      <div class="title">Chat Box</div>
+      <div class="subtitle">Configure and toggle for this domain</div>
+      <div id="currentDomain" class="domain-info"></div>
+    </div>
   
   <div class="config-section">
     <div class="input-group">
@@ -150,6 +253,9 @@
     </button>
     <div id="credentialsView" style="display: none; margin-top: 10px; max-height: 200px; overflow-y: auto; border: 1px solid #B32D2D; border-radius: 4px; padding: 8px; background: #ffffff; font-size: 11px;">
       <div id="credentialsList"></div>
+      <button id="exportCredentials" style="width: 100%; padding: 6px; background: #FF4040; color: #FAFAFA; border: none; border-radius: 4px; font-size: 11px; cursor: pointer; margin-top: 8px; font-weight: 500;">
+        📥 Export Credentials JSON
+      </button>
       <button id="clearCredentials" style="width: 100%; padding: 6px; background: #B32D2D; color: #FAFAFA; border: none; border-radius: 4px; font-size: 11px; cursor: pointer; margin-top: 8px; font-weight: 500;">
         🗑️ Clear All Credentials
       </button>
@@ -168,10 +274,11 @@
     </div>
   </div>
 
-  <div class="faq-section" style="margin-top: 20px;">
-    <button id="faqButton" style="width: 100%; padding: 8px; background: #FF4040; color: #FAFAFA; border: none; border-radius: 4px; font-size: 13px; cursor: pointer; font-weight: 500;">
-      ❓ Frequently Asked Questions
-    </button>
+    <div class="faq-section" style="margin-top: 20px;">
+      <button id="faqButton" style="width: 100%; padding: 8px; background: #FF4040; color: #FAFAFA; border: none; border-radius: 4px; font-size: 13px; cursor: pointer; font-weight: 500;">
+        ❓ Frequently Asked Questions
+      </button>
+    </div>
   </div>
   
   <script src="config.js"></script>

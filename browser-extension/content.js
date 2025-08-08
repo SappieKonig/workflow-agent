@@ -2,12 +2,26 @@ console.log('Content script loaded');
 let chatBoxContainer = null;
 let isVisible = false;
 let currentDomain = null;
+let privacyAgreed = false;
 
 // Get current domain
 try {
   currentDomain = window.location.hostname;
 } catch (error) {
   currentDomain = 'unknown';
+}
+
+// Check privacy agreement before initializing
+chrome.storage.local.get(['privacyAgreed'], (result) => {
+  privacyAgreed = result.privacyAgreed || false;
+  if (privacyAgreed) {
+    initializeChatBox();
+  }
+});
+
+function initializeChatBox() {
+  // Only initialize if privacy is agreed to
+  setupMessageListener();
 }
 
 function createChatBox() {
@@ -418,7 +432,8 @@ chrome.storage.local.get(['domainStates'], (result) => {
   }
 });
 
-chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+function setupMessageListener() {
+  chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   console.log('Message received:', request);
   if (request.action === 'toggleChatBox') {
     console.log('Toggling chat box, current visibility:', isVisible);
@@ -458,4 +473,5 @@ if (window.location.hostname.includes('.app.n8n.cloud')) {
       payload: message.payload 
     });
   });
+}
 }
